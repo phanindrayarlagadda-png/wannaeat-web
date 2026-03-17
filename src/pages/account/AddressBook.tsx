@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { MapPin, Plus, Trash2, Check } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { MapPin, Plus, Trash2, Check, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getAddresses, addAddress, deleteAddress, setDefaultAddress } from '../../helper/api'
 import Button from '../../components/common/Button'
@@ -9,13 +9,32 @@ import Spinner from '../../components/common/Spinner'
 import EmptyState from '../../components/common/EmptyState'
 import PageHeader from '../../components/common/PageHeader'
 import { Address } from '../../types'
+import { parseGooglePlace } from '../../utils/addressHelper'
+
+interface AddressForm {
+  label: string
+  street: string
+  address2: string
+  city: string
+  state: string
+  zipCode: string
+  lat?: number
+  lng?: number
+  placeId?: string
+  country?: string
+}
+
+const emptyForm: AddressForm = { label: '', street: '', address2: '', city: '', state: '', zipCode: '' }
 
 export default function AddressBook() {
   const [addresses, setAddresses] = useState<Address[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState({ label: '', street: '', city: '', state: '', zipCode: '' })
+  const [form, setForm] = useState<AddressForm>(emptyForm)
   const [saving, setSaving] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const autocompleteRef = useRef<any>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
 
   const fetchAddresses = () => {
     getAddresses()
@@ -25,12 +44,16 @@ export default function AddressBook() {
         const addrs = Array.isArray(data) ? data : (data?.addressBook || [])
         setAddresses(addrs.map((a: any) => ({
           id: a._id?.toString() || a.id || '',
-          label: a.label || a.type || '',
-          street: a.address1 || a.street || '',
+          label: a.label || a.addressType || a.type || '',
+          street: a.address1 || a.placeName || a.street || '',
+          address2: a.address2 || '',
+          placeName: a.placeName || '',
           city: a.city || '',
           state: a.state || '',
           zipCode: a.zipCode || a.zipcode || '',
           isDefault: a.defaultAddress || a.isDefault || false,
+          lat: a.location?.lat || a.lat || a.latitude || undefined,
+          lng: a.location?.lng || a.lng || a.longitude || undefined,
         })))
       })
       .catch(() => {})
@@ -39,15 +62,68 @@ export default function AddressBook() {
 
   useEffect(fetchAddresses, [])
 
+  // Initialize Google Places Autocomplete when modal opens
+  const initAutocomplete = useCallback(() => {
+    const win = window as any // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (!inputRef.current || !win.google?.maps?.places) return
+    if (autocompleteRef.current) return // already initialized
+
+    autocompleteRef.current = new win.google.maps.places.Autocomplete(inputRef.current, {
+      types: ['address'],
+      componentRestrictions: { country: 'us' },
+    })
+
+    autocompleteRef.current.addListener('place_changed', () => {
+      const place = autocompleteRef.current?.getPlace()
+      if (!place) return
+
+      const parsed = parseGooglePlace(place)
+      if (parsed) {
+        setForm(prev => ({
+          ...prev,
+          street: parsed.placeName || parsed.formattedAddress,
+          city: parsed.city,
+          state: parsed.state,
+          zipCode: parsed.zip,
+          lat: parsed.lat,
+          lng: parsed.lng,
+          placeId: parsed.placeId,
+          country: parsed.country,
+        }))
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (showModal) {
+      // Small delay to let the modal render the input
+      const timer = setTimeout(initAutocomplete, 200)
+      return () => clearTimeout(timer)
+    } else {
+      autocompleteRef.current = null
+    }
+  }, [showModal, initAutocomplete])
+
   const handleAdd = async () => {
     if (!form.street || !form.city) { toast.error('Street and city are required'); return }
     setSaving(true)
     try {
-      // Map frontend field names to API field names
-      await addAddress({ address1: form.street, city: form.city, state: form.state, zipCode: form.zipCode, label: form.label, defaultAddress: addresses.length === 0 })
+      await addAddress({
+        address1: form.street,
+        address2: form.address2,
+        city: form.city,
+        state: form.state,
+        zipCode: form.zipCode,
+        label: form.label,
+        country: form.country || 'Usa',
+        defaultAddress: addresses.length === 0,
+        ...(form.lat != null && form.lng != null && {
+          location: { lat: form.lat, lng: form.lng },
+        }),
+      })
       toast.success('Address added!')
       setShowModal(false)
-      setForm({ label: '', street: '', city: '', state: '', zipCode: '' })
+      setForm(emptyForm)
       fetchAddresses()
     } catch {
       toast.error('Failed to add address')
@@ -75,6 +151,8 @@ export default function AddressBook() {
       toast.error('Failed to update')
     }
   }
+
+  const hasGooglePlaces = typeof window !== 'undefined' && !!(window as any).google?.maps?.places // eslint-disable-line @typescript-eslint/no-explicit-any
 
   return (
     <div>
@@ -108,7 +186,7 @@ export default function AddressBook() {
               </div>
               <div className="flex-1 min-w-0">
                 {addr.label && <p className="font-semibold text-gray-900 text-sm">{addr.label}</p>}
-                <p className="text-sm text-gray-700">{addr.street}</p>
+                <p className="text-sm text-gray-700">{addr.street}{addr.address2 ? `, ${addr.address2}` : ''}</p>
                 <p className="text-xs text-gray-500">{addr.city}, {addr.state} {addr.zipCode}</p>
                 {addr.isDefault && (
                   <span className="inline-flex items-center gap-1 mt-1.5 text-xs text-primary font-medium">
@@ -141,8 +219,34 @@ export default function AddressBook() {
         <div className="space-y-4">
           <Input label="Label (e.g. Home)" placeholder="Home, Work..." value={form.label}
             onChange={e => setForm(p => ({ ...p, label: e.target.value }))} />
-          <Input label="Street *" placeholder="123 Main St" value={form.street}
-            onChange={e => setForm(p => ({ ...p, street: e.target.value }))} />
+
+          {/* Google Places Autocomplete or plain text input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Street Address *
+            </label>
+            <div className="relative">
+              {hasGooglePlaces && (
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              )}
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder={hasGooglePlaces ? 'Search for an address...' : '123 Main St'}
+                value={form.street}
+                onChange={e => setForm(p => ({ ...p, street: e.target.value }))}
+                className={`w-full border border-gray-300 rounded-xl py-2.5 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all ${
+                  hasGooglePlaces ? 'pl-9 pr-3' : 'px-3'
+                }`}
+              />
+            </div>
+            {hasGooglePlaces && (
+              <p className="text-xs text-gray-400 mt-1">Start typing to search with Google Places</p>
+            )}
+          </div>
+
+          <Input label="Apt / Suite / Floor" placeholder="Apt 4B" value={form.address2}
+            onChange={e => setForm(p => ({ ...p, address2: e.target.value }))} />
           <div className="grid grid-cols-2 gap-3">
             <Input label="City *" placeholder="New York" value={form.city}
               onChange={e => setForm(p => ({ ...p, city: e.target.value }))} />

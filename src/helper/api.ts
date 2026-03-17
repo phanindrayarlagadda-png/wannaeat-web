@@ -19,10 +19,10 @@ export const sendOTP = (data: { phone?: string; email?: string }) =>
 export const verifyOTP = (data: { otp: string; phone?: string; email?: string }) =>
   apiClient.post('public/access/verifyOtp', data)
 
-export const forgotPassword = (data: { email: string }) =>
+export const forgotPassword = (data: { email?: string; phoneNumber?: string; countryCode?: string }) =>
   apiClient.post('public/access/forgotPassword', data)
 
-export const resetPassword = (data: object) =>
+export const resetPassword = (data: { newPassword: string; confirmPassword: string; phoneNumber: string; countryCode: string }) =>
   apiClient.post('public/access/resetPassword', data)
 
 export const logout = () =>
@@ -44,9 +44,28 @@ export const getAvailableToday = (params?: object) =>
 export const getBanners = () =>
   apiClient.get('private/banner/list')
 
+export const getNextClosedDate = (data: { date: string; chefId?: string; lat?: number; lng?: number; zipCode?: string }) =>
+  apiClient.post('public/homeScreen/getNextClosedDate', data)
+
 // ─── Search ──────────────────────────────────────────────────────────────────
-export const search = (params: { q: string; type?: 'chef' | 'dish' }) =>
-  apiClient.post('private/search/searchByKeyword', { keyword: params.q })
+export const search = (params: {
+  q: string
+  type?: 'chef' | 'dish'
+  userLat?: number
+  userLng?: number
+  zipCode?: string
+  cuisines?: string[]
+  dietary?: string[]
+}) =>
+  apiClient.post('private/search/searchByKeyword', {
+    keyword: params.q,
+    currentUtcDate: new Date().toISOString(),
+    cuisines: params.cuisines || [],
+    dietary: params.dietary || [],
+    ...(params.userLat != null && { userLat: params.userLat }),
+    ...(params.userLng != null && { userLng: params.userLng }),
+    ...(params.zipCode && { zipCode: params.zipCode }),
+  })
 
 // ─── Chef ────────────────────────────────────────────────────────────────────
 export const getChefProfile = (chefId: string) =>
@@ -100,10 +119,8 @@ export const getProfile = () =>
 export const updateProfile = (data: object) =>
   apiClient.post('private/access/updateProfile', data)
 
-export const uploadProfileImage = (formData: FormData) =>
-  apiClient.post('private/access/uploadProfileImage', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+// Note: uploadProfileImage endpoint was removed from the API.
+// Profile image upload should be done via updateProfile with base64 or FormData.
 
 // ─── Address ─────────────────────────────────────────────────────────────────
 export const getAddresses = () =>

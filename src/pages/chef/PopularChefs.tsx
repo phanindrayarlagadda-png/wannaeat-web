@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Star, Clock } from 'lucide-react'
 import { getPopularChefs } from '../../helper/api'
+import { buildImageUrl } from '../../utils/imageUrl'
 import Spinner from '../../components/common/Spinner'
 import EmptyState from '../../components/common/EmptyState'
 import PageHeader from '../../components/common/PageHeader'
@@ -35,7 +36,7 @@ export default function PopularChefs() {
               className="card p-4 text-left hover:shadow-md transition-shadow"
             >
               <img
-                src={chef.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(chef.name)}&background=FD207A&color=fff&size=120`}
+                src={buildImageUrl(chef.profileImage) || `https://ui-avatars.com/api/?name=${encodeURIComponent(chef.name)}&background=FD207A&color=fff&size=120`}
                 alt={chef.name}
                 className="w-full h-32 object-cover rounded-xl mb-3"
               />

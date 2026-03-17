@@ -6,7 +6,8 @@ import { useDispatch, useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
 import { RootState } from '../../redux/store'
 import { updateUser } from '../../redux/slices/authSlice'
-import { updateProfile, uploadProfileImage } from '../../helper/api'
+import { updateProfile } from '../../helper/api'
+import { buildImageUrl } from '../../utils/imageUrl'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 import PageHeader from '../../components/common/PageHeader'
@@ -61,18 +62,19 @@ export default function Profile() {
       toast.error('Image must be under 5 MB')
       return
     }
-    const formData = new FormData()
-    formData.append('image', file)
-    try {
-      const res = await uploadProfileImage(formData)
-      const url = res.data?.data?.url
-      if (url) {
-        dispatch(updateUser({ profileImage: url }))
+    // Convert to base64 and update via updateProfile (uploadProfileImage endpoint removed)
+    const reader = new FileReader()
+    reader.onloadend = async () => {
+      try {
+        const base64 = reader.result as string
+        await updateProfile({ profileImage: base64 })
+        dispatch(updateUser({ profileImage: base64 }))
         toast.success('Profile photo updated!')
+      } catch {
+        toast.error('Failed to upload image')
       }
-    } catch {
-      toast.error('Failed to upload image')
     }
+    reader.readAsDataURL(file)
   }
 
   return (
@@ -84,7 +86,7 @@ export default function Profile() {
         <div className="flex flex-col items-center">
           <div className="relative">
             {user?.profileImage ? (
-              <img src={user.profileImage} alt={displayName || 'Profile'} className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md" />
+              <img src={buildImageUrl(user.profileImage)} alt={displayName || 'Profile'} className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md" />
             ) : (
               <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-primary text-3xl font-bold border-4 border-white shadow-md">
                 {displayName?.charAt(0).toUpperCase() || '?'}

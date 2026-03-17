@@ -3,6 +3,7 @@ import { ShoppingCart, Bell, Search, MapPin } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { RootState } from '../../redux/store'
 import { selectCartItemCount } from '../../redux/slices/cartSlice'
+import { buildImageUrl } from '../../utils/imageUrl'
 import logoImg from '../../assets/logowannaeat3.png'
 
 export default function Header() {
@@ -73,7 +74,7 @@ export default function Header() {
               <button onClick={() => navigate('/account')} className="shrink-0">
                 {user.profileImage ? (
                   <img
-                    src={user.profileImage}
+                    src={buildImageUrl(user.profileImage)}
                     alt={user.name}
                     className="w-9 h-9 rounded-full object-cover border-2 border-primary/20"
                   />

@@ -1,17 +1,31 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, ChevronRight, Clock, Star } from 'lucide-react'
+import { Search, ChevronRight, Clock, Star, CalendarDays } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { RootState } from '../../redux/store'
-import { getHomeData, getBanners } from '../../helper/api'
+import { getHomeData, getBanners, getNextClosedDate } from '../../helper/api'
 import Spinner from '../../components/common/Spinner'
 import { Chef, Dish } from '../../types'
+import { buildImageUrl } from '../../utils/imageUrl'
 
 interface HomeData {
   banners: { id: string; image: string; title?: string }[]
   popularChefs: Chef[]
   popularDishes: Dish[]
   availableToday: Chef[]
+  lunchDishes?: Dish[]
+  dinnerDishes?: Dish[]
+}
+
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr)
+  return {
+    day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+    date: d.getDate(),
+    month: d.toLocaleDateString('en-US', { month: 'short' }),
+    iso: dateStr,
+    isToday: new Date().toDateString() === d.toDateString(),
+  }
 }
 
 export default function Home() {
@@ -25,6 +39,42 @@ export default function Home() {
     availableToday: [],
   })
   const [activeBanner, setActiveBanner] = useState(0)
+  const [activeDates, setActiveDates] = useState<string[]>([])
+  const [selectedDate, setSelectedDate] = useState<string>('')
+  const [noActiveDishes, setNoActiveDishes] = useState(false)
+
+  // Fetch active dates from API
+  const fetchActiveDates = useCallback(async () => {
+    try {
+      const now = new Date()
+      const res = await getNextClosedDate({ date: now.toISOString() })
+      const dates: string[] = res.data?.data?.date || res.data?.data || []
+      if (dates.length > 0) {
+        setActiveDates(dates)
+        setSelectedDate(prev => prev || dates[0])
+        setNoActiveDishes(false)
+      } else {
+        setNoActiveDishes(true)
+        // Fallback: generate 15 sequential dates
+        const fallback = Array.from({ length: 15 }, (_, i) => {
+          const d = new Date()
+          d.setDate(d.getDate() + i)
+          return d.toISOString().split('T')[0]
+        })
+        setActiveDates(fallback)
+        setSelectedDate(fallback[0])
+      }
+    } catch {
+      // Fallback dates
+      const fallback = Array.from({ length: 15 }, (_, i) => {
+        const d = new Date()
+        d.setDate(d.getDate() + i)
+        return d.toISOString().split('T')[0]
+      })
+      setActiveDates(fallback)
+      setSelectedDate(fallback[0])
+    }
+  }, [])
 
   useEffect(() => {
     const fetchHome = async () => {
@@ -32,13 +82,14 @@ export default function Home() {
         const [homeRes] = await Promise.all([getHomeData(), getBanners()])
         setData(homeRes.data?.data || homeRes.data || {})
       } catch {
-        // Use empty state - API not yet connected
+        // Use empty state
       } finally {
         setLoading(false)
       }
     }
     fetchHome()
-  }, [])
+    fetchActiveDates()
+  }, [fetchActiveDates])
 
   if (loading) {
     return (
@@ -77,7 +128,7 @@ export default function Home() {
             {data.banners.map(banner => (
               <img
                 key={banner.id}
-                src={banner.image}
+                src={buildImageUrl(banner.image)}
                 alt={banner.title}
                 className="w-full flex-shrink-0 h-44 object-cover rounded-2xl"
               />
@@ -99,61 +150,108 @@ export default function Home() {
         </div>
       )}
 
-      {/* Available Today */}
-      <Section
-        title="Available Today"
-        onViewAll={() => navigate('/available-today')}
-      >
-        {data.availableToday?.length > 0 ? (
-          <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-            {data.availableToday.slice(0, 8).map(chef => (
-              <ChefCard key={chef.id} chef={chef} onClick={() => navigate(`/chef/${chef.id}`)} />
-            ))}
+      {/* Date Ribbon */}
+      {activeDates.length > 0 && !noActiveDishes && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <CalendarDays size={16} className="text-primary" />
+            <span className="text-sm font-semibold text-gray-700">Available Dates</span>
           </div>
-        ) : (
-          <PlaceholderChefs onNavigate={id => navigate(`/chef/${id}`)} />
-        )}
-      </Section>
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+            {activeDates.slice(0, 15).map(dateStr => {
+              const d = formatDate(dateStr)
+              const isSelected = selectedDate === dateStr
+              return (
+                <button
+                  key={dateStr}
+                  onClick={() => setSelectedDate(dateStr)}
+                  className={`flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                    isSelected
+                      ? 'bg-primary text-white shadow-md scale-105'
+                      : d.isToday
+                        ? 'bg-primary/10 text-primary border border-primary/20'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <span className="text-[10px] uppercase">{d.day}</span>
+                  <span className="text-lg font-bold leading-tight">{d.date}</span>
+                  <span className="text-[10px]">{d.month}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* No Active Dishes message */}
+      {noActiveDishes && (
+        <div className="text-center py-12">
+          <p className="text-lg font-semibold text-gray-700">No dishes available</p>
+          <p className="text-sm text-gray-400 mt-1">Check back later for new menus</p>
+        </div>
+      )}
+
+      {/* Available Today */}
+      {!noActiveDishes && (
+        <Section
+          title="Available Today"
+          onViewAll={() => navigate('/available-today')}
+        >
+          {data.availableToday?.length > 0 ? (
+            <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+              {data.availableToday.slice(0, 8).map(chef => (
+                <ChefCard key={chef.id} chef={chef} onClick={() => navigate(`/chef/${chef.id}`)} />
+              ))}
+            </div>
+          ) : (
+            <PlaceholderChefs onNavigate={id => navigate(`/chef/${id}`)} />
+          )}
+        </Section>
+      )}
 
       {/* Popular Dishes */}
-      <Section
-        title="Popular Dishes"
-        onViewAll={() => navigate('/dishes')}
-      >
-        {data.popularDishes?.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {data.popularDishes.slice(0, 4).map(dish => (
-              <DishCard key={dish.id} dish={dish} />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <DishCardSkeleton key={i} />
-            ))}
-          </div>
-        )}
-      </Section>
+      {!noActiveDishes && (
+        <Section
+          title="Popular Dishes"
+          onViewAll={() => navigate('/dishes')}
+        >
+          {data.popularDishes?.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {data.popularDishes.slice(0, 4).map(dish => (
+                <DishCard key={dish.id} dish={dish} />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <DishCardSkeleton key={i} />
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
 
       {/* Popular Chefs */}
-      <Section
-        title="Popular Chefs"
-        onViewAll={() => navigate('/chefs')}
-      >
-        {data.popularChefs?.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {data.popularChefs.slice(0, 6).map(chef => (
-              <ChefCard key={chef.id} chef={chef} onClick={() => navigate(`/chef/${chef.id}`)} vertical />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <ChefCardSkeleton key={i} />
-            ))}
-          </div>
-        )}
-      </Section>
+      {!noActiveDishes && (
+        <Section
+          title="Popular Chefs"
+          onViewAll={() => navigate('/chefs')}
+        >
+          {data.popularChefs?.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {data.popularChefs.slice(0, 6).map(chef => (
+                <ChefCard key={chef.id} chef={chef} onClick={() => navigate(`/chef/${chef.id}`)} vertical />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <ChefCardSkeleton key={i} />
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
     </div>
   )
 }
@@ -177,7 +275,7 @@ function ChefCard({ chef, onClick, vertical }: { chef: Chef; onClick: () => void
     return (
       <button onClick={onClick} className="card p-3 text-left hover:shadow-md transition-shadow">
         <img
-          src={chef.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(chef.name)}&background=FD207A&color=fff`}
+          src={buildImageUrl(chef.profileImage) || `https://ui-avatars.com/api/?name=${encodeURIComponent(chef.name)}&background=FD207A&color=fff`}
           alt={chef.name}
           className="w-full h-24 object-cover rounded-xl mb-2"
         />
@@ -195,7 +293,7 @@ function ChefCard({ chef, onClick, vertical }: { chef: Chef; onClick: () => void
       className="flex-shrink-0 w-32 card p-3 text-center hover:shadow-md transition-shadow"
     >
       <img
-        src={chef.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(chef.name)}&background=FD207A&color=fff`}
+        src={buildImageUrl(chef.profileImage) || `https://ui-avatars.com/api/?name=${encodeURIComponent(chef.name)}&background=FD207A&color=fff`}
         alt={chef.name}
         className="w-16 h-16 rounded-full object-cover mx-auto mb-2 border-2 border-primary/20"
       />
@@ -217,7 +315,7 @@ function DishCard({ dish }: { dish: Dish }) {
       className="card flex gap-3 p-3 text-left hover:shadow-md transition-shadow"
     >
       <img
-        src={dish.image || `https://picsum.photos/seed/${dish.id}/80/80`}
+        src={buildImageUrl(dish.image) || `https://picsum.photos/seed/${dish.id}/80/80`}
         alt={dish.name}
         className="w-20 h-20 object-cover rounded-xl flex-shrink-0"
       />

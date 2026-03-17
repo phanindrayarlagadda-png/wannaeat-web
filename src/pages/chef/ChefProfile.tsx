@@ -1,15 +1,27 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Star, Clock, Heart, Plus, Minus, ShoppingCart, ChevronLeft, UtensilsCrossed } from 'lucide-react'
+import { Star, Clock, Heart, Plus, Minus, ShoppingCart, ChevronLeft, UtensilsCrossed, CalendarDays } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
-import { getChefProfile, getChefMenu } from '../../helper/api'
+import { getChefProfile, getChefMenu, getNextClosedDate } from '../../helper/api'
 import { addItem, updateQuantity, selectCartItemCount } from '../../redux/slices/cartSlice'
 import { RootState } from '../../redux/store'
 import Spinner from '../../components/common/Spinner'
 import { Chef, Dish } from '../../types'
+import { buildImageUrl } from '../../utils/imageUrl'
 
 type MealTab = 'all' | 'lunch' | 'dinner' | 'allMenu'
+
+function formatDatePill(dateStr: string) {
+  const d = new Date(dateStr)
+  return {
+    day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+    date: d.getDate(),
+    month: d.toLocaleDateString('en-US', { month: 'short' }),
+    iso: dateStr,
+    isToday: new Date().toDateString() === d.toDateString(),
+  }
+}
 
 export default function ChefProfile() {
   const { chefId } = useParams<{ chefId: string }>()
@@ -20,19 +32,52 @@ export default function ChefProfile() {
   const [mealTab, setMealTab] = useState<MealTab>('all')
   const [loading, setLoading] = useState(true)
   const [liked, setLiked] = useState(false)
+  const [activeDates, setActiveDates] = useState<string[]>([])
+  const [selectedDate, setSelectedDate] = useState<string>('')
+  const [noActiveDishes, setNoActiveDishes] = useState(false)
 
   const cartItems = useSelector((state: RootState) => state.cart.items)
   const cartCount = useSelector(selectCartItemCount)
+
+  const fetchActiveDates = useCallback(async () => {
+    if (!chefId) return
+    try {
+      const res = await getNextClosedDate({ date: new Date().toISOString(), chefId })
+      const dates: string[] = res.data?.data?.date || res.data?.data || []
+      if (dates.length > 0) {
+        setActiveDates(dates)
+        setSelectedDate(prev => prev || dates[0])
+        setNoActiveDishes(false)
+      } else {
+        setNoActiveDishes(true)
+        const fallback = Array.from({ length: 8 }, (_, i) => {
+          const d = new Date(); d.setDate(d.getDate() + i)
+          return d.toISOString().split('T')[0]
+        })
+        setActiveDates(fallback)
+        setSelectedDate(fallback[0])
+      }
+    } catch {
+      const fallback = Array.from({ length: 8 }, (_, i) => {
+        const d = new Date(); d.setDate(d.getDate() + i)
+        return d.toISOString().split('T')[0]
+      })
+      setActiveDates(fallback)
+      setSelectedDate(fallback[0])
+    }
+  }, [chefId])
 
   useEffect(() => {
     const fetchData = async () => {
       if (!chefId) return
       try {
+        const today = new Date().toISOString().split('T')[0]
         const [chefRes, menuRes] = await Promise.all([
           getChefProfile(chefId),
-          getChefMenu(chefId),
+          getChefMenu(chefId, { date: today, offerDate: today }),
         ])
-        setChef(chefRes.data?.data || chefRes.data)
+        const chefData = chefRes.data?.data || chefRes.data
+        setChef(chefData)
         setDishes(menuRes.data?.data || [])
       } catch {
         // show error state
@@ -41,7 +86,8 @@ export default function ChefProfile() {
       }
     }
     fetchData()
-  }, [chefId])
+    fetchActiveDates()
+  }, [chefId, fetchActiveDates])
 
   const getItemQty = (dishId: string) =>
     cartItems.find(i => i.dishId === dishId)?.quantity || 0
@@ -121,7 +167,7 @@ export default function ChefProfile() {
         <div className="card p-4 -mt-10 mx-4 relative z-10">
           <div className="flex items-start gap-4">
             <img
-              src={chef.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(chef.name)}&background=FD207A&color=fff`}
+              src={buildImageUrl(chef.profileImage) || `https://ui-avatars.com/api/?name=${encodeURIComponent(chef.name)}&background=FD207A&color=fff`}
               alt={chef.name}
               className="w-16 h-16 rounded-full object-cover border-4 border-white shadow-md flex-shrink-0"
             />
@@ -151,7 +197,49 @@ export default function ChefProfile() {
           {chef.bio && <p className="text-sm text-gray-600 mt-3 leading-relaxed">{chef.bio}</p>}
         </div>
 
+        {/* Date Ribbon */}
+        {activeDates.length > 0 && !noActiveDishes && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <CalendarDays size={16} className="text-primary" />
+              <span className="text-sm font-semibold text-gray-700">Available Dates</span>
+            </div>
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+              {activeDates.slice(0, 10).map(dateStr => {
+                const d = formatDatePill(dateStr)
+                const isSelected = selectedDate === dateStr
+                return (
+                  <button
+                    key={dateStr}
+                    onClick={() => setSelectedDate(dateStr)}
+                    className={`flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                      isSelected
+                        ? 'bg-primary text-white shadow-md scale-105'
+                        : d.isToday
+                          ? 'bg-primary/10 text-primary border border-primary/20'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    <span className="text-[10px] uppercase">{d.day}</span>
+                    <span className="text-lg font-bold leading-tight">{d.date}</span>
+                    <span className="text-[10px]">{d.month}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* No Active Dishes */}
+        {noActiveDishes && (
+          <div className="text-center py-12">
+            <p className="text-lg font-semibold text-gray-700">No dishes available</p>
+            <p className="text-sm text-gray-400 mt-1">This chef has no active menus at the moment</p>
+          </div>
+        )}
+
         {/* Meal tabs */}
+        {!noActiveDishes && (
         <div className="flex gap-2">
           {tabs.map(tab => (
             <button
@@ -165,13 +253,14 @@ export default function ChefProfile() {
             </button>
           ))}
         </div>
+        )}
 
         {/* Dishes */}
-        {filteredDishes.length === 0 ? (
+        {!noActiveDishes && filteredDishes.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
             <p>No dishes available for this time</p>
           </div>
-        ) : mealTab === 'allMenu' ? (
+        ) : !noActiveDishes && mealTab === 'allMenu' ? (
           /* ── All Menu Tab: Table-style list with Request button ── */
           <div className="pb-4">
             <div className="card overflow-hidden">
@@ -200,7 +289,7 @@ export default function ChefProfile() {
                       {/* Dish info */}
                       <div className="flex items-center gap-3 min-w-0">
                         <img
-                          src={dish.image || `https://picsum.photos/seed/${dish.id}/40`}
+                          src={buildImageUrl(dish.image) || `https://picsum.photos/seed/${dish.id}/40`}
                           alt={dish.name}
                           className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
                         />
@@ -254,7 +343,7 @@ export default function ChefProfile() {
               </div>
             </div>
           </div>
-        ) : (
+        ) : !noActiveDishes ? (
           /* ── Regular card-style dish list (All / Lunch / Dinner) ── */
           <div className="space-y-3 pb-4">
             {filteredDishes.map(dish => {
@@ -262,7 +351,7 @@ export default function ChefProfile() {
               return (
                 <div key={dish.id} className="card p-4 flex gap-3">
                   <img
-                    src={dish.image || `https://picsum.photos/seed/${dish.id}/80`}
+                    src={buildImageUrl(dish.image) || `https://picsum.photos/seed/${dish.id}/80`}
                     alt={dish.name}
                     className="w-20 h-20 rounded-xl object-cover flex-shrink-0"
                   />
@@ -303,7 +392,7 @@ export default function ChefProfile() {
               )
             })}
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Cart FAB */}

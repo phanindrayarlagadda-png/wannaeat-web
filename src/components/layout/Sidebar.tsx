@@ -6,6 +6,7 @@ import {
 import { useDispatch, useSelector } from 'react-redux'
 import { logout } from '../../redux/slices/authSlice'
 import { RootState } from '../../redux/store'
+import { buildImageUrl } from '../../utils/imageUrl'
 import toast from 'react-hot-toast'
 
 const mainNav = [
@@ -42,7 +43,7 @@ export default function Sidebar() {
       {user && (
         <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
           {user.profileImage ? (
-            <img src={user.profileImage} alt={(user as any).firstName || user.name || 'Profile'} className="w-12 h-12 rounded-full object-cover" />
+            <img src={buildImageUrl(user.profileImage)} alt={(user as any).firstName || user.name || 'Profile'} className="w-12 h-12 rounded-full object-cover" />
           ) : (
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
               {((user as any).firstName || user.name || '?').charAt(0).toUpperCase()}

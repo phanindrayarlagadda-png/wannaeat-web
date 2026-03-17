@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Star, MapPin } from 'lucide-react'
 import { getAvailableToday } from '../../helper/api'
+import { buildImageUrl } from '../../utils/imageUrl'
 import Spinner from '../../components/common/Spinner'
 import EmptyState from '../../components/common/EmptyState'
 import PageHeader from '../../components/common/PageHeader'
@@ -44,7 +45,7 @@ export default function AvailableToday() {
             >
               <div className="relative flex-shrink-0">
                 <img
-                  src={chef.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(chef.name)}&background=FD207A&color=fff`}
+                  src={buildImageUrl(chef.profileImage) || `https://ui-avatars.com/api/?name=${encodeURIComponent(chef.name)}&background=FD207A&color=fff`}
                   alt={chef.name}
                   className="w-16 h-16 rounded-full object-cover border-2 border-primary/20"
                 />

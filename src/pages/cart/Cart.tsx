@@ -3,6 +3,7 @@ import { Trash2, Plus, Minus, ShoppingCart } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import { RootState } from '../../redux/store'
 import { updateQuantity, removeItem, clearCart, selectCartSubtotal } from '../../redux/slices/cartSlice'
+import { buildImageUrl } from '../../utils/imageUrl'
 import Button from '../../components/common/Button'
 import EmptyState from '../../components/common/EmptyState'
 import PageHeader from '../../components/common/PageHeader'
@@ -59,7 +60,7 @@ export default function Cart() {
           {items.map(item => (
             <div key={item.dishId} className="p-4 flex items-center gap-3">
               {item.image && (
-                <img src={item.image} alt={item.dishName} className="w-16 h-16 rounded-xl object-cover flex-shrink-0" />
+                <img src={buildImageUrl(item.image)} alt={item.dishName} className="w-16 h-16 rounded-xl object-cover flex-shrink-0" />
               )}
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-gray-900 line-clamp-1">{item.dishName}</p>

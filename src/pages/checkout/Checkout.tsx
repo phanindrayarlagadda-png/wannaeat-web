@@ -37,11 +37,14 @@ export default function Checkout() {
         const fetchedAddresses: Address[] = addrArr.map((a: any) => ({
           id: a._id?.toString() || a.id || '',
           label: a.label || a.addressType || '',
-          street: a.address1 || a.street || '',
+          street: a.address1 || a.placeName || a.street || '',
+          address2: a.address2 || '',
           city: a.city || '',
           state: a.state || '',
           zipCode: a.zipCode || '',
           isDefault: a.defaultAddress || a.isDefault || false,
+          lat: a.lat || a.latitude || undefined,
+          lng: a.lng || a.longitude || undefined,
         }))
         setCards(fetchedCards)
         setAddresses(fetchedAddresses)
@@ -106,7 +109,7 @@ export default function Checkout() {
                   />
                   <div>
                     {addr.label && <p className="text-sm font-semibold text-gray-900">{addr.label}</p>}
-                    <p className="text-sm text-gray-700">{addr.street}</p>
+                    <p className="text-sm text-gray-700">{addr.street}{addr.address2 ? `, ${addr.address2}` : ''}</p>
                     <p className="text-xs text-gray-500">{addr.city}, {addr.state} {addr.zipCode}</p>
                   </div>
                 </label>

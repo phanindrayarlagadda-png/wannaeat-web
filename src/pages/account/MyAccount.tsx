@@ -7,6 +7,7 @@ import {
 import toast from 'react-hot-toast'
 import { RootState } from '../../redux/store'
 import { logout } from '../../redux/slices/authSlice'
+import { buildImageUrl } from '../../utils/imageUrl'
 
 const MENU_ITEMS = [
   { icon: User, label: 'Edit Profile', to: '/account/profile', color: 'text-blue-500' },
@@ -44,7 +45,7 @@ export default function MyAccount() {
       <div className="card p-5 flex items-center gap-4">
         <button onClick={() => navigate('/account/profile')} className="relative flex-shrink-0">
           {user?.profileImage ? (
-            <img src={user.profileImage} alt={displayName || 'Profile'} className="w-20 h-20 rounded-full object-cover border-2 border-primary/20" />
+            <img src={buildImageUrl(user.profileImage)} alt={displayName || 'Profile'} className="w-20 h-20 rounded-full object-cover border-2 border-primary/20" />
           ) : (
             <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold">
               {displayName?.charAt(0).toUpperCase() || '?'}

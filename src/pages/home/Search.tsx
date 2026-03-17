@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search as SearchIcon, X, ChefHat, UtensilsCrossed, Star } from 'lucide-react'
-import { search } from '../../helper/api'
+import { search, getAddresses } from '../../helper/api'
 import Spinner from '../../components/common/Spinner'
 import EmptyState from '../../components/common/EmptyState'
 import { Chef, Dish } from '../../types'
@@ -15,6 +15,12 @@ interface SearchResults {
   dishes: Dish[]
 }
 
+interface UserLocation {
+  lat: number
+  lng: number
+  zipCode?: string
+}
+
 export default function Search() {
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState<Tab>('all')
@@ -22,6 +28,40 @@ export default function Search() {
   const [results, setResults] = useState<SearchResults>({ chefs: [], dishes: [] })
   const [searched, setSearched] = useState(false)
   const navigate = useNavigate()
+  const locationRef = useRef<UserLocation | null>(null)
+
+  // Get user's location on mount: try saved address first (has zipCode), then browser geolocation
+  useEffect(() => {
+    // Try to get default address with zipCode from user's saved addresses
+    getAddresses()
+      .then((res) => {
+        const addresses = res.data?.data || []
+        const def = addresses.find((a: any) => a.defaultAddress) || addresses[0]
+        if (def) {
+          locationRef.current = {
+            lat: def.location?.lat || def.lat,
+            lng: def.location?.lng || def.lng,
+            zipCode: def.zipCode || def.zip || '',
+          }
+        }
+      })
+      .catch(() => {})
+
+    // Also try browser geolocation as fallback/supplement
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (!locationRef.current) {
+            locationRef.current = {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+            }
+          }
+        },
+        () => {}
+      )
+    }
+  }, [])
 
   const doSearch = useCallback(async (q: string, type: Tab) => {
     if (!q.trim()) {
@@ -32,7 +72,14 @@ export default function Search() {
     setLoading(true)
     setSearched(true)
     try {
-      const res = await search({ q: q.trim(), type: type === 'all' ? undefined : type })
+      const loc = locationRef.current
+      const res = await search({
+        q: q.trim(),
+        type: type === 'all' ? undefined : type,
+        ...(loc?.lat != null && { userLat: loc.lat }),
+        ...(loc?.lng != null && { userLng: loc.lng }),
+        ...(loc?.zipCode && { zipCode: loc.zipCode }),
+      })
       const raw = res.data?.data || { chefs: [], dishes: [] }
       // Normalize search results: fix image URLs and field names
       const chefs = (raw.chefs || []).map((c: any) => ({

@@ -95,9 +95,12 @@ export interface Address {
   id: string
   label?: string
   street: string
+  address2?: string
+  placeName?: string
   city: string
   state: string
   zipCode: string
+  country?: string
   isDefault?: boolean
   lat?: number
   lng?: number
