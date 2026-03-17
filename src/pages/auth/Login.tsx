@@ -6,6 +6,7 @@ import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
 import { useDispatch } from 'react-redux'
 import toast from 'react-hot-toast'
 import Input from '../../components/common/Input'
+import logoImg from '../../assets/logowannaeat3.png'
 import Button from '../../components/common/Button'
 import { login } from '../../helper/api'
 import { setCredentials } from '../../redux/slices/authSlice'
@@ -26,9 +27,9 @@ export default function Login() {
     onSubmit: async (values, { setSubmitting }) => {
       try {
         const res = await login(values)
-        const { token, user } = res.data
-        dispatch(setCredentials({ user, token }))
-        toast.success(`Welcome back, ${user.name}!`)
+        const { token, userDetails } = res.data.data
+        dispatch(setCredentials({ user: userDetails, token }))
+        toast.success(`Welcome back, ${userDetails.firstName || 'there'}!`)
         navigate('/')
       } catch (err: unknown) {
         const error = err as { response?: { data?: { message?: string } } }
@@ -44,10 +45,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold">
-            <span className="text-primary">Wanna</span>
-            <span className="text-gray-900">Eat</span>
-          </h1>
+          <img src={logoImg} alt="WannaEat" className="h-16 mx-auto mb-2" />
           <p className="text-gray-500 mt-2 text-sm">Home-cooked meals from local chefs</p>
         </div>
 

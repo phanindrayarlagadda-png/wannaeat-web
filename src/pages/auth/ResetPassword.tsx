@@ -5,6 +5,7 @@ import * as Yup from 'yup'
 import { Lock, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Input from '../../components/common/Input'
+import logoImg from '../../assets/logowannaeat3.png'
 import Button from '../../components/common/Button'
 import { resetPassword } from '../../helper/api'
 
@@ -40,9 +41,7 @@ export default function ResetPassword() {
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold">
-            <span className="text-primary">Wanna</span><span className="text-gray-900">Eat</span>
-          </h1>
+          <img src={logoImg} alt="WannaEat" className="h-16 mx-auto" />
         </div>
 
         <div className="card p-8">

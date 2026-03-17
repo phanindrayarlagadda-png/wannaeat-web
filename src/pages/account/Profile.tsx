@@ -22,17 +22,28 @@ export default function Profile() {
   const user = useSelector((state: RootState) => state.auth.user)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // Build display name from API fields (firstName/lastName) or fallback to name
+  const anyUser = user as any
+  const displayName = anyUser
+    ? (`${anyUser.firstName || ''} ${anyUser.lastName || ''}`.trim() || anyUser.name || '')
+    : ''
+  const displayPhone = anyUser?.phoneNumber || anyUser?.phone || ''
+
   const formik = useFormik({
     initialValues: {
-      name: user?.name || '',
+      name: displayName,
       email: user?.email || '',
-      phone: user?.phone || '',
+      phone: displayPhone,
     },
     validationSchema: schema,
     onSubmit: async (values, { setSubmitting }) => {
       try {
-        const res = await updateProfile(values)
-        const updatedUser = res.data?.data || values
+        // Split full name into firstName / lastName for the API
+        const parts = values.name.trim().split(/\s+/)
+        const firstName = parts[0] || ''
+        const lastName = parts.slice(1).join(' ') || ''
+        const res = await updateProfile({ firstName, lastName, email: values.email, phoneNumber: values.phone })
+        const updatedUser = res.data?.data || { firstName, lastName, email: values.email, phoneNumber: values.phone }
         dispatch(updateUser(updatedUser))
         toast.success('Profile updated!')
       } catch {
@@ -73,10 +84,10 @@ export default function Profile() {
         <div className="flex flex-col items-center">
           <div className="relative">
             {user?.profileImage ? (
-              <img src={user.profileImage} alt={user.name} className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md" />
+              <img src={user.profileImage} alt={displayName || 'Profile'} className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md" />
             ) : (
               <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-primary text-3xl font-bold border-4 border-white shadow-md">
-                {user?.name?.charAt(0).toUpperCase()}
+                {displayName?.charAt(0).toUpperCase() || '?'}
               </div>
             )}
             <button

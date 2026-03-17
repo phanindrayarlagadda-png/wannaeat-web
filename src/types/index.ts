@@ -1,11 +1,17 @@
 // ─── Auth ────────────────────────────────────────────────────────────────────
 export interface User {
   id: string
-  name: string
+  // API returns firstName/lastName separately; name is a computed convenience field
+  name?: string
+  firstName?: string
+  lastName?: string
+  fullName?: string
   email: string
   phone?: string
+  phoneNumber?: string
   profileImage?: string
   isPremium?: boolean
+  membership?: string
   walletBalance?: number
 }
 

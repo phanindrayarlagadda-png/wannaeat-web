@@ -53,7 +53,7 @@ export default function Home() {
       {/* Greeting */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900">
-          Hey {user?.name?.split(' ')[0]} 👋
+          Hey {user?.firstName || user?.name?.split(' ')[0] || 'there'} 👋
         </h2>
         <p className="text-gray-500 text-sm mt-1">What are you craving today?</p>
       </div>
@@ -115,26 +115,6 @@ export default function Home() {
         )}
       </Section>
 
-      {/* Popular Chefs */}
-      <Section
-        title="Popular Chefs"
-        onViewAll={() => navigate('/chefs')}
-      >
-        {data.popularChefs?.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {data.popularChefs.slice(0, 6).map(chef => (
-              <ChefCard key={chef.id} chef={chef} onClick={() => navigate(`/chef/${chef.id}`)} vertical />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <ChefCardSkeleton key={i} />
-            ))}
-          </div>
-        )}
-      </Section>
-
       {/* Popular Dishes */}
       <Section
         title="Popular Dishes"
@@ -150,6 +130,26 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <DishCardSkeleton key={i} />
+            ))}
+          </div>
+        )}
+      </Section>
+
+      {/* Popular Chefs */}
+      <Section
+        title="Popular Chefs"
+        onViewAll={() => navigate('/chefs')}
+      >
+        {data.popularChefs?.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {data.popularChefs.slice(0, 6).map(chef => (
+              <ChefCard key={chef.id} chef={chef} onClick={() => navigate(`/chef/${chef.id}`)} vertical />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <ChefCardSkeleton key={i} />
             ))}
           </div>
         )}

@@ -2,6 +2,7 @@ import { useRef, useState, KeyboardEvent, ClipboardEvent } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import Button from '../../components/common/Button'
+import logoImg from '../../assets/logowannaeat3.png'
 import { verifyOTP, sendOTP } from '../../helper/api'
 
 const OTP_LENGTH = 6
@@ -75,9 +76,7 @@ export default function OTP() {
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-secondary/5 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold">
-            <span className="text-primary">Wanna</span><span className="text-gray-900">Eat</span>
-          </h1>
+          <img src={logoImg} alt="WannaEat" className="h-16 mx-auto" />
         </div>
 
         <div className="card p-8 text-center">

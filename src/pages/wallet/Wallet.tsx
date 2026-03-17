@@ -16,7 +16,8 @@ export default function Wallet() {
     Promise.all([getWallet(), getWalletTransactions()])
       .then(([walletRes, txRes]) => {
         setBalance(walletRes.data?.data?.balance || 0)
-        setTransactions(txRes.data?.data || [])
+        const txData = txRes.data?.data
+        setTransactions(Array.isArray(txData) ? txData : (txData?.transactions || []))
       })
       .catch(() => {})
       .finally(() => setLoading(false))

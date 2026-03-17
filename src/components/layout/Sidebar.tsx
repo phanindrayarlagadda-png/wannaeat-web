@@ -42,14 +42,16 @@ export default function Sidebar() {
       {user && (
         <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
           {user.profileImage ? (
-            <img src={user.profileImage} alt={user.name} className="w-12 h-12 rounded-full object-cover" />
+            <img src={user.profileImage} alt={(user as any).firstName || user.name || 'Profile'} className="w-12 h-12 rounded-full object-cover" />
           ) : (
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
-              {user.name?.charAt(0).toUpperCase()}
+              {((user as any).firstName || user.name || '?').charAt(0).toUpperCase()}
             </div>
           )}
           <div className="min-w-0">
-            <p className="font-semibold text-gray-900 truncate">{user.name}</p>
+            <p className="font-semibold text-gray-900 truncate">
+              {`${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() || user.name || 'User'}
+            </p>
             <p className="text-xs text-gray-500 truncate">{user.email}</p>
           </div>
         </div>

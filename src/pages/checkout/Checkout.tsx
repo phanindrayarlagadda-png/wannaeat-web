@@ -26,10 +26,23 @@ export default function Checkout() {
   const total = subtotal + deliveryFee
 
   useEffect(() => {
-    Promise.all([getPaymentCards(), getAddresses()])
-      .then(([cardsRes, addrRes]) => {
+    Promise.all([
+      getPaymentCards().catch(() => ({ data: { data: [] } })),
+      getAddresses().catch(() => ({ data: { data: [] } })),
+    ]).then(([cardsRes, addrRes]) => {
         const fetchedCards: PaymentCard[] = cardsRes.data?.data || []
-        const fetchedAddresses: Address[] = addrRes.data?.data || []
+        // Map address fields from API shape to frontend shape
+        const addrRaw = addrRes.data?.data
+        const addrArr = Array.isArray(addrRaw) ? addrRaw : (addrRaw?.addressBook || [])
+        const fetchedAddresses: Address[] = addrArr.map((a: any) => ({
+          id: a._id?.toString() || a.id || '',
+          label: a.label || a.addressType || '',
+          street: a.address1 || a.street || '',
+          city: a.city || '',
+          state: a.state || '',
+          zipCode: a.zipCode || '',
+          isDefault: a.defaultAddress || a.isDefault || false,
+        }))
         setCards(fetchedCards)
         setAddresses(fetchedAddresses)
         const defCard = fetchedCards.find(c => c.isDefault)
@@ -37,7 +50,6 @@ export default function Checkout() {
         if (defCard) setSelectedCard(defCard.id)
         if (defAddr) setSelectedAddress(defAddr.id)
       })
-      .catch(() => {})
   }, [])
 
   const handlePlaceOrder = async () => {

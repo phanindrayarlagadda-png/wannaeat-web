@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
 import { RootState } from '../../redux/store'
 import { selectCartSubtotal } from '../../redux/slices/cartSlice'
-import { getCheckoutDetails, applyCoupon, removeCoupon } from '../../helper/api'
+import { getCheckoutDetails, applyCoupon, removeCoupon, getAddresses } from '../../helper/api'
 import Button from '../../components/common/Button'
 import PageHeader from '../../components/common/PageHeader'
 import Spinner from '../../components/common/Spinner'
@@ -30,17 +30,27 @@ export default function CartDetails() {
   const [selectedAddress, setSelectedAddress] = useState<string>('')
 
   useEffect(() => {
-    getCheckoutDetails()
-      .then(res => {
-        const data = res.data?.data || {}
-        setDetails(data)
-        setDiscount(data.discount || 0)
-        setAppliedCoupon(data.couponCode || '')
-        const def = data.addresses?.find((a: { isDefault?: boolean }) => a.isDefault)
-        if (def) setSelectedAddress(def.id)
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    Promise.all([
+      getCheckoutDetails().catch(() => ({ data: { data: {} } })),
+      getAddresses().catch(() => ({ data: { data: [] } })),
+    ]).then(([checkoutRes, addrRes]) => {
+      const data = checkoutRes.data?.data || {}
+      // Merge addresses from checkout or from address book API
+      const addrRaw = addrRes.data?.data
+      const addrArr = Array.isArray(addrRaw) ? addrRaw : (addrRaw?.addressBook || [])
+      const addresses = addrArr.map((a: any) => ({
+        id: a._id?.toString() || a.id || '',
+        street: a.address1 || a.street || '',
+        city: `${a.city || ''}${a.state ? ', ' + a.state : ''} ${a.zipCode || ''}`.trim(),
+        isDefault: a.defaultAddress || a.isDefault || false,
+      }))
+      setDetails({ ...data, addresses: data.addresses?.length ? data.addresses : addresses })
+      setDiscount(data.discount || 0)
+      setAppliedCoupon(data.couponCode || '')
+      const allAddrs = data.addresses?.length ? data.addresses : addresses
+      const def = allAddrs.find((a: { isDefault?: boolean }) => a.isDefault)
+      if (def) setSelectedAddress(def.id)
+    }).finally(() => setLoading(false))
   }, [])
 
   const deliveryFee = details?.deliveryFee ?? 4.99

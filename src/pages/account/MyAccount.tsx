@@ -23,6 +23,14 @@ export default function MyAccount() {
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const user = useSelector((state: RootState) => state.auth.user)
+  const anyUser = user as any
+
+  // Resolve display name from API fields (firstName/lastName) or fallback
+  const displayName = anyUser
+    ? (`${anyUser.firstName || ''} ${anyUser.lastName || ''}`.trim() || anyUser.name || anyUser.fullName || '')
+    : ''
+  const displayPhone = anyUser?.phoneNumber || anyUser?.phone || ''
+  const isPremium = anyUser?.membership === 'premium' || anyUser?.isPremium
 
   const handleLogout = () => {
     dispatch(logout())
@@ -36,25 +44,25 @@ export default function MyAccount() {
       <div className="card p-5 flex items-center gap-4">
         <button onClick={() => navigate('/account/profile')} className="relative flex-shrink-0">
           {user?.profileImage ? (
-            <img src={user.profileImage} alt={user.name} className="w-20 h-20 rounded-full object-cover border-2 border-primary/20" />
+            <img src={user.profileImage} alt={displayName || 'Profile'} className="w-20 h-20 rounded-full object-cover border-2 border-primary/20" />
           ) : (
             <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold">
-              {user?.name?.charAt(0).toUpperCase()}
+              {displayName?.charAt(0).toUpperCase() || '?'}
             </div>
           )}
-          {user?.isPremium && (
+          {isPremium && (
             <span className="absolute -bottom-1 -right-1 bg-yellow-400 text-xs font-bold px-1.5 py-0.5 rounded-full text-yellow-900">
               PRO
             </span>
           )}
         </button>
         <div className="min-w-0">
-          <h2 className="text-xl font-bold text-gray-900 truncate">{user?.name}</h2>
+          <h2 className="text-xl font-bold text-gray-900 truncate">{displayName || 'My Account'}</h2>
           <p className="text-sm text-gray-500 truncate">{user?.email}</p>
-          {user?.phone && <p className="text-sm text-gray-500">{user.phone}</p>}
-          {user?.walletBalance !== undefined && (
+          {displayPhone && <p className="text-sm text-gray-500">{displayPhone}</p>}
+          {anyUser?.walletBalance !== undefined && (
             <p className="text-sm font-semibold text-primary mt-1">
-              Wallet: ${user.walletBalance.toFixed(2)}
+              Wallet: ${(anyUser.walletBalance || 0).toFixed(2)}
             </p>
           )}
         </div>

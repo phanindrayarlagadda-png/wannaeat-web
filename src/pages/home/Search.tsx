@@ -6,6 +6,7 @@ import Spinner from '../../components/common/Spinner'
 import EmptyState from '../../components/common/EmptyState'
 import { Chef, Dish } from '../../types'
 import { useDebouncedCallback } from '../../hooks/useDebouncedCallback'
+import { buildImageUrl } from '../../utils/imageUrl'
 
 type Tab = 'all' | 'chef' | 'dish'
 
@@ -32,7 +33,24 @@ export default function Search() {
     setSearched(true)
     try {
       const res = await search({ q: q.trim(), type: type === 'all' ? undefined : type })
-      setResults(res.data?.data || { chefs: [], dishes: [] })
+      const raw = res.data?.data || { chefs: [], dishes: [] }
+      // Normalize search results: fix image URLs and field names
+      const chefs = (raw.chefs || []).map((c: any) => ({
+        ...c,
+        id: c._id?.toString() || c.id || '',
+        name: c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.fullName || 'Chef',
+        profileImage: buildImageUrl(c.profileImage),
+        cuisine: Array.isArray(c.cuisineOffered) ? c.cuisineOffered : (c.cuisine || []),
+        rating: c.rating || 0,
+        reviewCount: c.reviewCount || 0,
+      }))
+      const dishes = (raw.dishes || []).map((d: any) => ({
+        ...d,
+        id: d._id?.toString() || d.id || '',
+        image: buildImageUrl(d.dishImage || d.image),
+        price: d.price || 0,
+      }))
+      setResults({ chefs, dishes })
     } catch {
       setResults({ chefs: [], dishes: [] })
     } finally {

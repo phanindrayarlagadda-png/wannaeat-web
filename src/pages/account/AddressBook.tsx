@@ -19,7 +19,20 @@ export default function AddressBook() {
 
   const fetchAddresses = () => {
     getAddresses()
-      .then(res => setAddresses(res.data?.data || []))
+      .then(res => {
+        const data = res.data?.data
+        // API returns user object with addressBook, or array directly
+        const addrs = Array.isArray(data) ? data : (data?.addressBook || [])
+        setAddresses(addrs.map((a: any) => ({
+          id: a._id?.toString() || a.id || '',
+          label: a.label || a.type || '',
+          street: a.address1 || a.street || '',
+          city: a.city || '',
+          state: a.state || '',
+          zipCode: a.zipCode || a.zipcode || '',
+          isDefault: a.defaultAddress || a.isDefault || false,
+        })))
+      })
       .catch(() => {})
       .finally(() => setLoading(false))
   }
@@ -30,7 +43,8 @@ export default function AddressBook() {
     if (!form.street || !form.city) { toast.error('Street and city are required'); return }
     setSaving(true)
     try {
-      await addAddress(form)
+      // Map frontend field names to API field names
+      await addAddress({ address1: form.street, city: form.city, state: form.state, zipCode: form.zipCode, label: form.label, defaultAddress: addresses.length === 0 })
       toast.success('Address added!')
       setShowModal(false)
       setForm({ label: '', street: '', city: '', state: '', zipCode: '' })

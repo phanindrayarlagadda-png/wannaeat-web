@@ -3,6 +3,7 @@ import { ShoppingCart, Bell, Search, MapPin } from 'lucide-react'
 import { useSelector } from 'react-redux'
 import { RootState } from '../../redux/store'
 import { selectCartItemCount } from '../../redux/slices/cartSlice'
+import logoImg from '../../assets/logowannaeat3.png'
 
 export default function Header() {
   const navigate = useNavigate()
@@ -12,11 +13,10 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-4 h-[72px] flex items-center justify-between gap-4">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-1 shrink-0">
-          <span className="text-2xl font-bold text-primary">Wanna</span>
-          <span className="text-2xl font-bold text-gray-900">Eat</span>
+        <Link to="/" className="shrink-0 flex items-center gap-2">
+          <img src={logoImg} alt="WannaEat" className="h-14 object-contain" />
         </Link>
 
         {/* Location (hidden on small mobile) */}

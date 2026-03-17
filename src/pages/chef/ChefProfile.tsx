@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Star, Clock, Heart, Plus, Minus, ShoppingCart, ChevronLeft } from 'lucide-react'
+import { Star, Clock, Heart, Plus, Minus, ShoppingCart, ChevronLeft, UtensilsCrossed } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
 import { getChefProfile, getChefMenu } from '../../helper/api'
@@ -9,7 +9,7 @@ import { RootState } from '../../redux/store'
 import Spinner from '../../components/common/Spinner'
 import { Chef, Dish } from '../../types'
 
-type MealTab = 'lunch' | 'dinner' | 'all'
+type MealTab = 'all' | 'lunch' | 'dinner' | 'allMenu'
 
 export default function ChefProfile() {
   const { chefId } = useParams<{ chefId: string }>()
@@ -70,7 +70,16 @@ export default function ChefProfile() {
     dispatch(updateQuantity({ dishId, quantity: current + delta }))
   }
 
-  const filteredDishes = mealTab === 'all' ? dishes : dishes.filter(d => d.mealTime === mealTab)
+  const filteredDishes = mealTab === 'all' || mealTab === 'allMenu'
+    ? dishes
+    : dishes.filter(d => d.mealTime === mealTab)
+
+  const tabs: { key: MealTab; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'lunch', label: 'Lunch' },
+    { key: 'dinner', label: 'Dinner' },
+    { key: 'allMenu', label: 'All Menu' },
+  ]
 
   if (loading) {
     return <div className="flex justify-center items-center h-64"><Spinner size="lg" /></div>
@@ -144,15 +153,15 @@ export default function ChefProfile() {
 
         {/* Meal tabs */}
         <div className="flex gap-2">
-          {(['all', 'lunch', 'dinner'] as MealTab[]).map(tab => (
+          {tabs.map(tab => (
             <button
-              key={tab}
-              onClick={() => setMealTab(tab)}
-              className={`px-4 py-2 rounded-full text-sm font-medium capitalize transition-colors ${
-                mealTab === tab ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              key={tab.key}
+              onClick={() => setMealTab(tab.key)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                mealTab === tab.key ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -162,7 +171,91 @@ export default function ChefProfile() {
           <div className="text-center py-12 text-gray-400">
             <p>No dishes available for this time</p>
           </div>
+        ) : mealTab === 'allMenu' ? (
+          /* ── All Menu Tab: Table-style list with Request button ── */
+          <div className="pb-4">
+            <div className="card overflow-hidden">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-primary/5 to-secondary/5 px-4 py-3 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <UtensilsCrossed size={18} className="text-primary" />
+                  <h2 className="font-semibold text-gray-900">Complete Menu</h2>
+                  <span className="text-xs text-gray-500 ml-1">({filteredDishes.length} items)</span>
+                </div>
+              </div>
+
+              {/* Table header */}
+              <div className="grid grid-cols-[1fr_100px_120px] gap-2 px-4 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <span>Dish</span>
+                <span className="text-right">Price</span>
+                <span className="text-center">Action</span>
+              </div>
+
+              {/* Dish rows */}
+              <div className="divide-y divide-gray-50">
+                {filteredDishes.map(dish => {
+                  const qty = getItemQty(dish.id)
+                  return (
+                    <div key={dish.id} className="grid grid-cols-[1fr_100px_120px] gap-2 items-center px-4 py-3 hover:bg-gray-50/50 transition-colors">
+                      {/* Dish info */}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={dish.image || `https://picsum.photos/seed/${dish.id}/40`}
+                          alt={dish.name}
+                          className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900 text-sm truncate">{dish.name}</p>
+                          {dish.description && (
+                            <p className="text-xs text-gray-400 truncate">{dish.description}</p>
+                          )}
+                          {dish.mealTime && (
+                            <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded capitalize">
+                              {dish.mealTime}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Price */}
+                      <p className="font-bold text-primary text-sm text-right">${dish.price?.toFixed(2)}</p>
+
+                      {/* Request / Qty controls */}
+                      <div className="flex justify-center">
+                        {qty > 0 ? (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => handleUpdateQty(dish.id, -1)}
+                              className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary hover:bg-primary/20"
+                            >
+                              <Minus size={14} />
+                            </button>
+                            <span className="font-bold text-gray-900 w-5 text-center text-sm">{qty}</span>
+                            <button
+                              onClick={() => handleUpdateQty(dish.id, 1)}
+                              className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-white hover:bg-primary-600"
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleAdd(dish)}
+                            className="px-3 py-1.5 bg-primary text-white text-xs font-semibold rounded-full hover:bg-primary-600 transition-colors flex items-center gap-1"
+                          >
+                            <Plus size={12} />
+                            Request
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
         ) : (
+          /* ── Regular card-style dish list (All / Lunch / Dinner) ── */
           <div className="space-y-3 pb-4">
             {filteredDishes.map(dish => {
               const qty = getItemQty(dish.id)
