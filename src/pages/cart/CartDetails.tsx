@@ -1,60 +1,71 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Tag, X, MapPin } from 'lucide-react'
-import { useSelector } from 'react-redux'
 import toast from 'react-hot-toast'
-import { RootState } from '../../redux/store'
-import { selectCartSubtotal } from '../../redux/slices/cartSlice'
 import { getCheckoutDetails, applyCoupon, removeCoupon, getAddresses } from '../../helper/api'
+import { buildImageUrl } from '../../utils/imageUrl'
 import Button from '../../components/common/Button'
 import PageHeader from '../../components/common/PageHeader'
 import Spinner from '../../components/common/Spinner'
 
-interface CheckoutDetails {
-  deliveryFee: number
-  discount: number
-  couponCode?: string
-  addresses: { id: string; street: string; city: string; isDefault?: boolean }[]
-}
-
 export default function CartDetails() {
   const navigate = useNavigate()
-  const items = useSelector((state: RootState) => state.cart.items)
-  const subtotal = useSelector(selectCartSubtotal)
-  const [details, setDetails] = useState<CheckoutDetails | null>(null)
+  const location = useLocation()
+  const cartState = location.state as {
+    minimumOrderLimit?: number
+    smallOrderCharge?: number
+    spiceLevel?: string
+    deliveryPreference?: string
+    chefInstructions?: string
+    driverInstructions?: string
+  } | null
+
   const [loading, setLoading] = useState(true)
   const [couponInput, setCouponInput] = useState('')
   const [couponLoading, setCouponLoading] = useState(false)
   const [appliedCoupon, setAppliedCoupon] = useState('')
   const [discount, setDiscount] = useState(0)
   const [selectedAddress, setSelectedAddress] = useState<string>('')
+  const [addresses, setAddresses] = useState<any[]>([])
+  const [checkoutData, setCheckoutData] = useState<any>(null)
 
   useEffect(() => {
     Promise.all([
       getCheckoutDetails().catch(() => ({ data: { data: {} } })),
       getAddresses().catch(() => ({ data: { data: [] } })),
     ]).then(([checkoutRes, addrRes]) => {
-      const data = checkoutRes.data?.data || {}
-      // Merge addresses from checkout or from address book API
+      const raw = checkoutRes.data?.data || {}
+      // API returns { cartData, userData, couponData, totalItems }
+      const cart = raw.cartData || raw
+      setCheckoutData(cart)
+
+      // Map addresses
       const addrRaw = addrRes.data?.data
       const addrArr = Array.isArray(addrRaw) ? addrRaw : (addrRaw?.addressBook || [])
-      const addresses = addrArr.map((a: any) => ({
+      const mapped = addrArr.map((a: any) => ({
         id: a._id?.toString() || a.id || '',
         street: a.address1 || a.street || '',
         city: `${a.city || ''}${a.state ? ', ' + a.state : ''} ${a.zipCode || ''}`.trim(),
         isDefault: a.defaultAddress || a.isDefault || false,
+        zipCode: a.zipCode || '',
+        lat: a.location?.coordinates?.[1] || a.lat,
+        lng: a.location?.coordinates?.[0] || a.lng,
+        fullAddress: a,
       }))
-      setDetails({ ...data, addresses: data.addresses?.length ? data.addresses : addresses })
-      setDiscount(data.discount || 0)
-      setAppliedCoupon(data.couponCode || '')
-      const allAddrs = data.addresses?.length ? data.addresses : addresses
-      const def = allAddrs.find((a: { isDefault?: boolean }) => a.isDefault)
+      setAddresses(mapped)
+
+      setDiscount(raw.couponData?.discount || cart.discountAmt || 0)
+      setAppliedCoupon(raw.couponData?.couponCode || '')
+      const def = mapped.find((a: any) => a.isDefault)
       if (def) setSelectedAddress(def.id)
     }).finally(() => setLoading(false))
   }, [])
 
-  const deliveryFee = details?.deliveryFee ?? 4.99
-  const total = subtotal + deliveryFee - discount
+  // Pricing from checkout API
+  const subTotal = checkoutData?.subTotal || 0
+  const deliveryFee = checkoutData?.deliveryFee || checkoutData?.deliveryFees || 0
+  const tax = checkoutData?.tax || 0
+  const total = subTotal + deliveryFee + tax - discount
 
   const handleApplyCoupon = async () => {
     if (!couponInput.trim()) return
@@ -87,29 +98,51 @@ export default function CartDetails() {
   if (loading) {
     return (
       <div>
-        <PageHeader title="Cart Details" />
+        <PageHeader title="Order Summary" />
         <div className="flex justify-center py-12"><Spinner size="lg" /></div>
       </div>
     )
   }
 
+  const selectedAddr = addresses.find((a: any) => a.id === selectedAddress)
+
   return (
     <div>
-      <PageHeader title="Cart Details" />
+      <PageHeader title="Order Summary" />
 
       <div className="space-y-4">
-        {/* Items summary */}
-        <div className="card p-4">
-          <p className="font-semibold text-gray-900 mb-3">Items ({items.length})</p>
-          <div className="space-y-2">
-            {items.map(item => (
-              <div key={item.dishId} className="flex justify-between text-sm">
-                <span className="text-gray-700">{item.dishName} × {item.quantity}</span>
-                <span className="font-medium">${(item.price * item.quantity).toFixed(2)}</span>
-              </div>
-            ))}
+        {/* Order items */}
+        {checkoutData?.dishData?.length > 0 && (
+          <div className="card overflow-hidden">
+            <div className="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
+              Order Items ({checkoutData.dishData.reduce((s: number, d: any) => s + (d.qty || 1), 0)})
+            </div>
+            <div className="divide-y divide-gray-100">
+              {checkoutData.dishData.map((item: any, idx: number) => (
+                <div key={item._id || idx} className="p-4 flex items-center gap-3">
+                  {(item.dishId?.dishImage) && (
+                    <img
+                      src={buildImageUrl(item.dishId.dishImage)}
+                      alt={item.dishId?.name}
+                      className="w-12 h-12 rounded-xl object-cover flex-shrink-0"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm text-gray-900 line-clamp-1">
+                      {item.dishId?.name || 'Dish'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Qty: {item.qty || 1} × ${(item.dishId?.price || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <p className="font-bold text-sm text-primary">
+                    ${((item.dishId?.price || 0) * (item.qty || 1)).toFixed(2)}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Delivery address */}
         <div className="card p-4">
@@ -125,9 +158,9 @@ export default function CartDetails() {
               Change
             </button>
           </div>
-          {details?.addresses?.length ? (
+          {addresses.length > 0 ? (
             <div className="space-y-2">
-              {details.addresses.slice(0, 3).map(addr => (
+              {addresses.slice(0, 3).map((addr: any) => (
                 <label key={addr.id} className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="radio"
@@ -196,30 +229,44 @@ export default function CartDetails() {
 
         {/* Bill summary */}
         <div className="card p-4 space-y-2">
-          <p className="font-semibold text-gray-900 mb-2">Bill Summary</p>
+          <p className="font-semibold text-gray-900 mb-2">Payment Details</p>
           <div className="flex justify-between text-sm text-gray-600">
-            <span>Item total</span><span>${subtotal.toFixed(2)}</span>
+            <span>Sub-Total</span><span>${subTotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-sm text-gray-600">
-            <span>Delivery fee</span><span>${deliveryFee.toFixed(2)}</span>
-          </div>
+          {deliveryFee > 0 && (
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Delivery Fee</span><span>${deliveryFee.toFixed(2)}</span>
+            </div>
+          )}
           {discount > 0 && (
             <div className="flex justify-between text-sm text-green-600">
               <span>Discount</span><span>-${discount.toFixed(2)}</span>
             </div>
           )}
+          {tax > 0 && (
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Tax</span><span>${Number(tax).toFixed(2)}</span>
+            </div>
+          )}
           <div className="border-t border-gray-100 pt-2 flex justify-between font-bold text-gray-900">
-            <span>Total</span><span>${total.toFixed(2)}</span>
+            <span>Total</span><span className="text-primary">${total.toFixed(2)}</span>
           </div>
         </div>
 
         <Button
           fullWidth
           size="lg"
-          onClick={() => navigate('/checkout')}
-          disabled={!selectedAddress && !!details?.addresses?.length}
+          onClick={() => navigate('/checkout', {
+            state: {
+              ...cartState,
+              selectedAddress: selectedAddr,
+              discount,
+              coupon: appliedCoupon,
+            },
+          })}
+          disabled={!selectedAddress && addresses.length > 0}
         >
-          Continue to Payment — ${total.toFixed(2)}
+          Proceed to Pay — ${total.toFixed(2)}
         </Button>
       </div>
     </div>

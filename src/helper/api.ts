@@ -11,7 +11,7 @@ export const socialLogin = (data: object) =>
   apiClient.post('public/access/socialLogin', data)
 
 export const signUp = (data: object) =>
-  apiClient.post('public/access/register', data)
+  apiClient.post('public/access/signUp', data)
 
 export const sendOTP = (data: { phone?: string; email?: string }) =>
   apiClient.post('public/access/sendOtp', data)
@@ -47,6 +47,16 @@ export const getBanners = () =>
 export const getNextClosedDate = (data: { date: string; chefId?: string; lat?: number; lng?: number; zipCode?: string }) =>
   apiClient.post('public/homeScreen/getNextClosedDate', data)
 
+export const getTodayMenu = (data: { date: string; currentDate: string; lat?: number; lng?: number; zipCode?: string }) => {
+  const params = new URLSearchParams({ date: data.date, currentDate: data.currentDate })
+  if (data.lat != null) params.set('lat', String(data.lat))
+  else params.set('lat', '1')
+  if (data.lng != null) params.set('lng', String(data.lng))
+  else params.set('lng', '1')
+  if (data.zipCode) params.set('zipCode', data.zipCode)
+  return apiClient.post(`public/homeScreen/getTodayMenuCopy?${params.toString()}`, {})
+}
+
 // ─── Search ──────────────────────────────────────────────────────────────────
 export const search = (params: {
   q: string
@@ -74,18 +84,46 @@ export const getChefProfile = (chefId: string) =>
 export const getChefMenu = (chefId: string, params?: object) =>
   apiClient.get('private/chef/getMenu', { params: { chefId, ...params } })
 
+// Same endpoint the mobile app uses for chef profile + dishes
+export const getChefDetails = (params: { chefId: string; date: string; offerDate: string; userLat?: number; userLng?: number; zipCode?: string }) =>
+  apiClient.get('private/search/getChefDetails', { params })
+
+export const getChefReviews = (chefId: string) =>
+  apiClient.get('private/search/getChefReviews', { params: { chefId } })
+
 export const favouriteChef = (chefId: string) =>
-  apiClient.post('private/chef/favourite', { chefId })
+  apiClient.post('private/myAccount/addAndRemoveFavouriteChef', { chefId })
+
+export const getFavouriteChefs = () =>
+  apiClient.get('private/myAccount/getFavouriteChefs')
+
+export const getFavouriteDishes = () =>
+  apiClient.post('private/myAccount/getFavouriteDishes', { currentUtcDate: new Date().toISOString() })
+
+export const favouriteDish = (dishId: string) =>
+  apiClient.post('private/myAccount/addAndRemoveFavouriteDish', { dishId })
 
 // ─── Cart ────────────────────────────────────────────────────────────────────
-export const clearCart = () =>
+export const clearCartApi = () =>
   apiClient.post('private/cart/clearCart')
 
 export const getCheckoutDetails = () =>
   apiClient.get('private/cart/getCheckOutDetails')
 
 export const addToCartScheduled = (data: object) =>
-  apiClient.post('private/cart/addToCartScheduled', data)
+  apiClient.post('private/v2/cart/addToCartScheduled', data)
+
+export const getCartDetails = (params: { lat?: number; lng?: number; zipCode?: string }) =>
+  apiClient.get('private/cart/getCartDetails', { params })
+
+export const updateDishQty = (data: { dishId: string; qty: number; scheduledDate: string; zipCode?: string }) =>
+  apiClient.post('private/v2/cart/updateDishQty', data)
+
+export const removeDishFromCart = (data: { dishId: string; dishPrice: number; dishQty: number; zipCode?: string }) =>
+  apiClient.post('private/cart/removeDishFromCart', data)
+
+export const checkOutDetails = (data: object) =>
+  apiClient.post('private/cart/checkOutDetails', data)
 
 export const applyCoupon = (data: { code: string }) =>
   apiClient.post('private/v2/cart/applyCoupon', data)
@@ -99,6 +137,15 @@ export const placeOrder = (data: object) =>
 
 export const getOrders = (params?: object) =>
   apiClient.get('private/order/list', { params })
+
+export const getOpenOrders = (date: string) =>
+  apiClient.get(`private/myAccount/getOpenOrders?date=${date}`)
+
+export const getScheduledOrders = () =>
+  apiClient.get('private/myAccount/getScheduledOrders')
+
+export const getDeliveredOrders = () =>
+  apiClient.get('private/myAccount/getDeliveredOrders')
 
 export const getOrderDetails = (orderId: string) =>
   apiClient.post('private/order/details', { orderId })
@@ -180,6 +227,15 @@ export const getNotificationSettings = () =>
 
 export const updateNotificationSettings = (data: object) =>
   apiClient.post('private/notification/updateSettings', data)
+
+export const clearAllNotifications = () =>
+  apiClient.post('private/myAccount/clearNotifications')
+
+export const clearNotificationById = (id: string) =>
+  apiClient.post('private/myAccount/clearNotificationById', { id })
+
+export const deleteAccount = () =>
+  apiClient.post('private/access/deleteUser')
 
 // ─── Chat ────────────────────────────────────────────────────────────────────
 export const getConversations = () =>

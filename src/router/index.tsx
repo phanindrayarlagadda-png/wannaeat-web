@@ -42,11 +42,15 @@ import Profile from '../pages/account/Profile'
 import AddressBook from '../pages/account/AddressBook'
 import PaymentMethods from '../pages/account/PaymentMethods'
 import Settings from '../pages/account/Settings'
+import Services from '../pages/account/Services'
 import PremiumMembership from '../pages/account/PremiumMembership'
 
 // Chat
 import MyChat from '../pages/chat/MyChat'
 import ChatDetails from '../pages/chat/ChatDetails'
+
+// Favorites
+import Favorites from '../pages/favorites/Favorites'
 
 // Notifications
 import Notifications from '../pages/notifications/Notifications'
@@ -114,7 +118,18 @@ export default function AppRouter() {
         <Route path="/account/addresses" element={<AddressBook />} />
         <Route path="/account/payment-methods" element={<PaymentMethods />} />
         <Route path="/account/settings" element={<Settings />} />
+        <Route path="/account/services" element={<Services />} />
         <Route path="/account/premium" element={<PremiumMembership />} />
+
+        {/* Settings CMS pages */}
+        <Route path="/settings/faq" element={<CMSPage />} />
+        <Route path="/settings/contact" element={<CMSPage />} />
+        <Route path="/settings/terms" element={<CMSPage />} />
+        <Route path="/settings/privacy" element={<CMSPage />} />
+        <Route path="/settings/about" element={<CMSPage />} />
+
+        {/* Favorites */}
+        <Route path="/favorites" element={<Favorites />} />
 
         {/* Chat */}
         <Route path="/chat" element={<MyChat />} />

@@ -1,76 +1,97 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { CreditCard, Calendar, MapPin } from 'lucide-react'
-import { useSelector } from 'react-redux'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { CreditCard, MapPin } from 'lucide-react'
+import { useDispatch } from 'react-redux'
 import toast from 'react-hot-toast'
-import { RootState } from '../../redux/store'
-import { selectCartSubtotal } from '../../redux/slices/cartSlice'
-import { getPaymentCards, getAddresses } from '../../helper/api'
+import { clearCart, setCartCount } from '../../redux/slices/cartSlice'
+import { getPaymentCards, getAddresses, placeOrder } from '../../helper/api'
 import Button from '../../components/common/Button'
 import PageHeader from '../../components/common/PageHeader'
 import { PaymentCard, Address } from '../../types'
 
 export default function Checkout() {
   const navigate = useNavigate()
-  const items = useSelector((state: RootState) => state.cart.items)
-  const subtotal = useSelector(selectCartSubtotal)
-  const scheduledDate = useSelector((state: RootState) => state.cart.scheduledDate)
+  const dispatch = useDispatch()
+  const location = useLocation()
+  const navState = location.state as {
+    selectedAddress?: any
+    discount?: number
+    coupon?: string
+    spiceLevel?: string
+    deliveryPreference?: string
+  } | null
+
   const [cards, setCards] = useState<PaymentCard[]>([])
   const [addresses, setAddresses] = useState<Address[]>([])
   const [selectedCard, setSelectedCard] = useState<string>('')
   const [selectedAddress, setSelectedAddress] = useState<string>('')
-  const [scheduleDate, setScheduleDate] = useState(scheduledDate || '')
   const [loading, setLoading] = useState(false)
-
-  const deliveryFee = 4.99
-  const total = subtotal + deliveryFee
 
   useEffect(() => {
     Promise.all([
       getPaymentCards().catch(() => ({ data: { data: [] } })),
       getAddresses().catch(() => ({ data: { data: [] } })),
     ]).then(([cardsRes, addrRes]) => {
-        const fetchedCards: PaymentCard[] = cardsRes.data?.data || []
-        // Map address fields from API shape to frontend shape
-        const addrRaw = addrRes.data?.data
-        const addrArr = Array.isArray(addrRaw) ? addrRaw : (addrRaw?.addressBook || [])
-        const fetchedAddresses: Address[] = addrArr.map((a: any) => ({
-          id: a._id?.toString() || a.id || '',
-          label: a.label || a.addressType || '',
-          street: a.address1 || a.placeName || a.street || '',
-          address2: a.address2 || '',
-          city: a.city || '',
-          state: a.state || '',
-          zipCode: a.zipCode || '',
-          isDefault: a.defaultAddress || a.isDefault || false,
-          lat: a.lat || a.latitude || undefined,
-          lng: a.lng || a.longitude || undefined,
-        }))
-        setCards(fetchedCards)
-        setAddresses(fetchedAddresses)
-        const defCard = fetchedCards.find(c => c.isDefault)
-        const defAddr = fetchedAddresses.find(a => a.isDefault)
-        if (defCard) setSelectedCard(defCard.id)
-        if (defAddr) setSelectedAddress(defAddr.id)
-      })
-  }, [])
+      const fetchedCards: PaymentCard[] = cardsRes.data?.data || []
+      const addrRaw = addrRes.data?.data
+      const addrArr = Array.isArray(addrRaw) ? addrRaw : (addrRaw?.addressBook || [])
+      const fetchedAddresses: Address[] = addrArr.map((a: any) => ({
+        id: a._id?.toString() || a.id || '',
+        label: a.label || a.addressType || '',
+        street: a.address1 || a.placeName || a.street || '',
+        address2: a.address2 || '',
+        city: a.city || '',
+        state: a.state || '',
+        zipCode: a.zipCode || '',
+        isDefault: a.defaultAddress || a.isDefault || false,
+        lat: a.location?.coordinates?.[1] || a.lat || undefined,
+        lng: a.location?.coordinates?.[0] || a.lng || undefined,
+      }))
+      setCards(fetchedCards)
+      setAddresses(fetchedAddresses)
+      const defCard = fetchedCards.find(c => c.isDefault)
+      const defAddr = fetchedAddresses.find(a => a.isDefault)
+      if (defCard) setSelectedCard(defCard.id)
+      // Use navState address if provided, otherwise default
+      if (navState?.selectedAddress?.id) {
+        setSelectedAddress(navState.selectedAddress.id)
+      } else if (defAddr) {
+        setSelectedAddress(defAddr.id)
+      }
+    })
+  }, [navState?.selectedAddress?.id])
 
   const handlePlaceOrder = async () => {
     if (!selectedCard) { toast.error('Please select a payment method'); return }
     if (!selectedAddress) { toast.error('Please select a delivery address'); return }
-    if (items.length === 0) { toast.error('Your cart is empty'); return }
+
+    const addr = addresses.find(a => a.id === selectedAddress)
 
     setLoading(true)
     try {
-      const { placeOrder } = await import('../../helper/api')
+      // Match mobile's placeOrder body
       const res = await placeOrder({
-        addressId: selectedAddress,
+        placeOrderDate: new Date().toISOString(),
+        userAddress: addr ? {
+          address1: addr.street,
+          address2: addr.address2,
+          city: addr.city,
+          state: addr.state,
+          zipCode: addr.zipCode,
+        } : undefined,
+        userLocation: addr?.lat && addr?.lng ? { lat: addr.lat, lng: addr.lng } : undefined,
         cardId: selectedCard,
-        scheduledAt: scheduleDate || undefined,
-        items,
       })
-      const orderId = res.data?.data?.orderId || res.data?.orderId
-      navigate(`/order-placed/${orderId}`)
+
+      if (res.data?.status === 1 || res.data?.data?.orderId) {
+        const orderId = res.data?.data?.orderId || res.data?.orderId || ''
+        dispatch(clearCart())
+        dispatch(setCartCount(0))
+        toast.success(res.data?.message || 'Order placed successfully!')
+        navigate(`/order-placed/${orderId}`)
+      } else {
+        toast.error(res.data?.message || 'Failed to place order')
+      }
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } }
       toast.error(error?.response?.data?.message || 'Failed to place order')
@@ -125,22 +146,6 @@ export default function Checkout() {
           )}
         </div>
 
-        {/* Schedule */}
-        <div className="card p-4">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2 mb-3">
-            <Calendar size={16} className="text-primary" />
-            Schedule (Optional)
-          </h3>
-          <input
-            type="datetime-local"
-            value={scheduleDate}
-            onChange={e => setScheduleDate(e.target.value)}
-            min={new Date().toISOString().slice(0, 16)}
-            className="input-field text-sm"
-          />
-          <p className="text-xs text-gray-400 mt-1">Leave empty to order ASAP</p>
-        </div>
-
         {/* Payment method */}
         <div className="card p-4">
           <div className="flex items-center justify-between mb-3">
@@ -189,21 +194,8 @@ export default function Checkout() {
           )}
         </div>
 
-        {/* Total */}
-        <div className="card p-4 space-y-2">
-          <div className="flex justify-between text-sm text-gray-600">
-            <span>Subtotal</span><span>${subtotal.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-sm text-gray-600">
-            <span>Delivery</span><span>${deliveryFee.toFixed(2)}</span>
-          </div>
-          <div className="border-t border-gray-100 pt-2 flex justify-between font-bold text-gray-900 text-base">
-            <span>Total</span><span>${total.toFixed(2)}</span>
-          </div>
-        </div>
-
         <Button fullWidth size="lg" loading={loading} onClick={handlePlaceOrder}>
-          Place Order — ${total.toFixed(2)}
+          Place Order
         </Button>
       </div>
     </div>

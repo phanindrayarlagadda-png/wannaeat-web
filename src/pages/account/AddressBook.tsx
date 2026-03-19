@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { MapPin, Plus, Trash2, Check, Search } from 'lucide-react'
+import { MapPin, Plus, Check, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getAddresses, addAddress, deleteAddress, setDefaultAddress } from '../../helper/api'
 import Button from '../../components/common/Button'
@@ -30,8 +30,10 @@ export default function AddressBook() {
   const [addresses, setAddresses] = useState<Address[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<AddressForm>(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [deleteModal, setDeleteModal] = useState<string | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const autocompleteRef = useRef<any>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -40,7 +42,6 @@ export default function AddressBook() {
     getAddresses()
       .then(res => {
         const data = res.data?.data
-        // API returns user object with addressBook, or array directly
         const addrs = Array.isArray(data) ? data : (data?.addressBook || [])
         setAddresses(addrs.map((a: any) => ({
           id: a._id?.toString() || a.id || '',
@@ -66,7 +67,7 @@ export default function AddressBook() {
   const initAutocomplete = useCallback(() => {
     const win = window as any // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!inputRef.current || !win.google?.maps?.places) return
-    if (autocompleteRef.current) return // already initialized
+    if (autocompleteRef.current) return
 
     autocompleteRef.current = new win.google.maps.places.Autocomplete(inputRef.current, {
       types: ['address'],
@@ -76,7 +77,6 @@ export default function AddressBook() {
     autocompleteRef.current.addListener('place_changed', () => {
       const place = autocompleteRef.current?.getPlace()
       if (!place) return
-
       const parsed = parseGooglePlace(place)
       if (parsed) {
         setForm(prev => ({
@@ -96,7 +96,6 @@ export default function AddressBook() {
 
   useEffect(() => {
     if (showModal) {
-      // Small delay to let the modal render the input
       const timer = setTimeout(initAutocomplete, 200)
       return () => clearTimeout(timer)
     } else {
@@ -104,11 +103,31 @@ export default function AddressBook() {
     }
   }, [showModal, initAutocomplete])
 
-  const handleAdd = async () => {
+  const openAddModal = () => {
+    setEditingId(null)
+    setForm(emptyForm)
+    setShowModal(true)
+  }
+
+  const openEditModal = (addr: Address) => {
+    setEditingId(addr.id)
+    setForm({
+      label: addr.label || '',
+      street: addr.street || '',
+      address2: addr.address2 || '',
+      city: addr.city || '',
+      state: addr.state || '',
+      zipCode: addr.zipCode || '',
+    })
+    setShowModal(true)
+  }
+
+  const handleSave = async () => {
     if (!form.street || !form.city) { toast.error('Street and city are required'); return }
     setSaving(true)
     try {
       await addAddress({
+        ...(editingId && { _id: editingId }),
         address1: form.street,
         address2: form.address2,
         city: form.city,
@@ -121,12 +140,13 @@ export default function AddressBook() {
           location: { lat: form.lat, lng: form.lng },
         }),
       })
-      toast.success('Address added!')
+      toast.success(editingId ? 'Address updated!' : 'Address added!')
       setShowModal(false)
       setForm(emptyForm)
+      setEditingId(null)
       fetchAddresses()
     } catch {
-      toast.error('Failed to add address')
+      toast.error(editingId ? 'Failed to update address' : 'Failed to add address')
     } finally {
       setSaving(false)
     }
@@ -136,6 +156,7 @@ export default function AddressBook() {
     try {
       await deleteAddress(id)
       setAddresses(prev => prev.filter(a => a.id !== id))
+      setDeleteModal(null)
       toast.success('Address removed')
     } catch {
       toast.error('Failed to delete address')
@@ -159,9 +180,12 @@ export default function AddressBook() {
       <PageHeader
         title="Address Book"
         rightAction={
-          <Button size="sm" leftIcon={<Plus size={16} />} onClick={() => setShowModal(true)}>
-            Add
-          </Button>
+          <button
+            onClick={openAddModal}
+            className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white shadow-md hover:bg-primary/90"
+          >
+            <Plus size={18} />
+          </button>
         }
       />
 
@@ -170,52 +194,65 @@ export default function AddressBook() {
       ) : addresses.length === 0 ? (
         <EmptyState
           icon={<MapPin size={48} strokeWidth={1} />}
-          title="No addresses saved"
+          title="No Address Found"
           description="Add a delivery address to get started"
           actionLabel="Add Address"
-          onAction={() => setShowModal(true)}
+          onAction={openAddModal}
         />
       ) : (
         <div className="space-y-3">
           {addresses.map(addr => (
-            <div key={addr.id} className="card p-4 flex items-start gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                addr.isDefault ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-500'
-              }`}>
-                <MapPin size={20} />
-              </div>
-              <div className="flex-1 min-w-0">
-                {addr.label && <p className="font-semibold text-gray-900 text-sm">{addr.label}</p>}
-                <p className="text-sm text-gray-700">{addr.street}{addr.address2 ? `, ${addr.address2}` : ''}</p>
-                <p className="text-xs text-gray-500">{addr.city}, {addr.state} {addr.zipCode}</p>
-                {addr.isDefault && (
-                  <span className="inline-flex items-center gap-1 mt-1.5 text-xs text-primary font-medium">
-                    <Check size={12} /> Default
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-col gap-1 flex-shrink-0">
-                {!addr.isDefault && (
-                  <button
-                    onClick={() => handleSetDefault(addr.id)}
-                    className="text-xs text-secondary hover:underline"
-                  >
-                    Set Default
-                  </button>
-                )}
-                <button
-                  onClick={() => handleDelete(addr.id)}
-                  className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                >
-                  <Trash2 size={16} />
-                </button>
+            <div
+              key={addr.id}
+              onClick={() => handleSetDefault(addr.id)}
+              className={`card p-4 cursor-pointer transition-all ${
+                addr.isDefault ? 'border-primary/30 bg-primary/[0.02]' : 'hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  addr.isDefault ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-500'
+                }`}>
+                  <MapPin size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  {addr.label && <p className="font-semibold text-gray-900 text-sm mb-0.5">{addr.label}</p>}
+                  <p className="text-sm text-gray-700">{addr.street}{addr.address2 ? `, ${addr.address2}` : ''}</p>
+                  <p className="text-xs text-gray-500">{addr.city}, {addr.state} {addr.zipCode}</p>
+
+                  {/* Default badge - matching mobile's red tick style */}
+                  {addr.isDefault && (
+                    <span className="inline-flex items-center gap-1 mt-2 text-xs text-red-600 font-medium">
+                      <Check size={14} className="text-red-500" /> Marked default
+                    </span>
+                  )}
+
+                  {/* Edit / Delete links - matching mobile's underlined magenta style */}
+                  <div className="flex items-center gap-4 mt-2">
+                    <button
+                      onClick={e => { e.stopPropagation(); openEditModal(addr) }}
+                      className="text-xs text-primary font-medium underline hover:text-primary/80"
+                    >
+                      Edit
+                    </button>
+                    {!addr.isDefault && (
+                      <button
+                        onClick={e => { e.stopPropagation(); setDeleteModal(addr.id) }}
+                        className="text-xs text-primary font-medium underline hover:text-primary/80"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add Address">
+      {/* Add / Edit Address Modal */}
+      <Modal isOpen={showModal} onClose={() => { setShowModal(false); setEditingId(null) }} title={editingId ? 'Edit Address' : 'Add Address'}>
         <div className="space-y-4">
           <Input label="Label (e.g. Home)" placeholder="Home, Work..." value={form.label}
             onChange={e => setForm(p => ({ ...p, label: e.target.value }))} />
@@ -223,7 +260,7 @@ export default function AddressBook() {
           {/* Google Places Autocomplete or plain text input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Street Address *
+              Address Line 1 *
             </label>
             <div className="relative">
               {hasGooglePlaces && (
@@ -245,20 +282,31 @@ export default function AddressBook() {
             )}
           </div>
 
-          <Input label="Apt / Suite / Floor" placeholder="Apt 4B" value={form.address2}
+          <Input label="Address Line 2" placeholder="Apt 4B" value={form.address2}
             onChange={e => setForm(p => ({ ...p, address2: e.target.value }))} />
           <div className="grid grid-cols-2 gap-3">
             <Input label="City *" placeholder="New York" value={form.city}
               onChange={e => setForm(p => ({ ...p, city: e.target.value }))} />
-            <Input label="State" placeholder="NY" value={form.state}
+            <Input label="State *" placeholder="NY" value={form.state}
               onChange={e => setForm(p => ({ ...p, state: e.target.value }))} />
           </div>
-          <Input label="Zip Code" placeholder="10001" value={form.zipCode}
-            onChange={e => setForm(p => ({ ...p, zipCode: e.target.value }))} />
+          <Input label="Zip Code *" placeholder="10001" value={form.zipCode} maxLength={5}
+            onChange={e => setForm(p => ({ ...p, zipCode: e.target.value.replace(/\D/g, '').slice(0, 5) }))} />
           <div className="flex gap-3">
-            <Button variant="outline" fullWidth onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button fullWidth loading={saving} onClick={handleAdd}>Save Address</Button>
+            <Button variant="outline" fullWidth onClick={() => { setShowModal(false); setEditingId(null) }}>Cancel</Button>
+            <Button fullWidth loading={saving} onClick={handleSave}>
+              {editingId ? 'Save' : 'Add'}
+            </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Delete confirmation modal */}
+      <Modal isOpen={!!deleteModal} onClose={() => setDeleteModal(null)} title="Delete Address?">
+        <p className="text-gray-600 mb-6">Are you sure you want to delete this address?</p>
+        <div className="flex gap-3">
+          <Button variant="outline" fullWidth onClick={() => setDeleteModal(null)}>No</Button>
+          <Button variant="danger" fullWidth onClick={() => deleteModal && handleDelete(deleteModal)}>Yes</Button>
         </div>
       </Modal>
     </div>

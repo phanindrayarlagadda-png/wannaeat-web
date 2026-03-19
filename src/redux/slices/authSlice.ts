@@ -8,12 +8,22 @@ interface AuthState {
   loading: boolean
 }
 
-const initialState: AuthState = {
-  user: null,
-  token: null,
-  isAuthenticated: false,
-  loading: false,
+// Hydrate from localStorage synchronously so ProtectedRoute works on page refresh
+function getInitialState(): AuthState {
+  try {
+    const token = localStorage.getItem('authToken')
+    const userStr = localStorage.getItem('user')
+    if (token && userStr) {
+      const user = JSON.parse(userStr)
+      return { user, token, isAuthenticated: true, loading: false }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return { user: null, token: null, isAuthenticated: false, loading: false }
 }
+
+const initialState: AuthState = getInitialState()
 
 const authSlice = createSlice({
   name: 'auth',

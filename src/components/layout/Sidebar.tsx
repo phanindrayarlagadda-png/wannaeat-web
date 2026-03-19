@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  Home, Tag, Wallet, ClipboardList, User, MapPin,
-  CreditCard, Settings, Star, MessageCircle, Bell, LogOut, ChevronRight
+  Home, Search, ShoppingCart, User, Tag, Wallet, ClipboardList, MapPin,
+  CreditCard, Settings, Star, MessageCircle, Bell, LogOut, ChevronRight, UtensilsCrossed
 } from 'lucide-react'
 import { useDispatch, useSelector } from 'react-redux'
 import { logout } from '../../redux/slices/authSlice'
@@ -11,15 +11,19 @@ import toast from 'react-hot-toast'
 
 const mainNav = [
   { to: '/', icon: Home, label: 'Home' },
-  { to: '/offers', icon: Tag, label: 'Offers' },
-  { to: '/wallet', icon: Wallet, label: 'Wallet' },
-  { to: '/orders', icon: ClipboardList, label: 'My Orders' },
+  { to: '/search', icon: Search, label: 'Search' },
+  { to: '/cart', icon: ShoppingCart, label: 'Cart' },
+  { to: '/account', icon: User, label: 'Account' },
 ]
 
 const accountNav = [
   { to: '/account/profile', icon: User, label: 'Profile' },
-  { to: '/account/addresses', icon: MapPin, label: 'Addresses' },
-  { to: '/account/payment-methods', icon: CreditCard, label: 'Payment Methods' },
+  { to: '/account/services', icon: UtensilsCrossed, label: 'Services' },
+  { to: '/account/addresses', icon: MapPin, label: 'Address Book' },
+  { to: '/account/payment-methods', icon: CreditCard, label: 'Payment' },
+  { to: '/orders', icon: ClipboardList, label: 'My Orders' },
+  { to: '/offers', icon: Tag, label: 'Offers' },
+  { to: '/wallet', icon: Wallet, label: 'Wallet' },
   { to: '/account/premium', icon: Star, label: 'Premium' },
   { to: '/chat', icon: MessageCircle, label: 'Chat' },
   { to: '/notifications', icon: Bell, label: 'Notifications' },

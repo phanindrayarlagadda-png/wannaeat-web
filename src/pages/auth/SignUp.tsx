@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useFormik } from 'formik'
 import * as Yup from 'yup'
-import { Eye, EyeOff, Mail, Lock, User, Phone } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, User, Phone, MapPin } from 'lucide-react'
 import { useDispatch } from 'react-redux'
 import toast from 'react-hot-toast'
 import Input from '../../components/common/Input'
@@ -12,9 +12,11 @@ import { signUp } from '../../helper/api'
 import { setCredentials } from '../../redux/slices/authSlice'
 
 const schema = Yup.object({
-  name: Yup.string().min(2, 'Min 2 characters').required('Name is required'),
+  firstName: Yup.string().min(2, 'Min 2 characters').required('First name is required'),
+  lastName: Yup.string().min(1, 'Required').required('Last name is required'),
   email: Yup.string().email('Enter a valid email').required('Email is required'),
-  phone: Yup.string().matches(/^\d{10}$/, 'Enter a valid 10-digit phone').required('Phone is required'),
+  phoneNumber: Yup.string().matches(/^\d{10}$/, 'Enter a valid 10-digit phone').required('Phone is required'),
+  zipCode: Yup.string().matches(/^\d{5}$/, 'Enter a valid 5-digit zip code').required('Zip code is required'),
   password: Yup.string().min(8, 'Min 8 characters').required('Password is required'),
   confirmPassword: Yup.string()
     .oneOf([Yup.ref('password')], 'Passwords must match')
@@ -27,15 +29,39 @@ export default function SignUp() {
   const navigate = useNavigate()
 
   const formik = useFormik({
-    initialValues: { name: '', email: '', phone: '', password: '', confirmPassword: '' },
+    initialValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phoneNumber: '',
+      zipCode: '',
+      password: '',
+      confirmPassword: '',
+    },
     validationSchema: schema,
     onSubmit: async (values, { setSubmitting }) => {
       try {
-        const res = await signUp(values)
-        const { token, user } = res.data
-        dispatch(setCredentials({ user, token }))
-        toast.success('Account created successfully!')
-        navigate('/')
+        const payload = {
+          ...values,
+          countryCode: '+1',
+        }
+        const res = await signUp(payload)
+        const data = res.data?.data || res.data
+        if (data?.token) {
+          dispatch(setCredentials({ user: data.user || data, token: data.token }))
+          toast.success('Account created successfully!')
+          navigate('/')
+        } else {
+          // API returns user data + OTP flow — navigate to OTP verification
+          toast.success(res.data?.message || 'Verification code sent to your email!')
+          navigate('/otp', {
+            state: {
+              userData: data,
+              comingFrom: 'signup',
+              password: values.password,
+            },
+          })
+        }
       } catch (err: unknown) {
         const error = err as { response?: { data?: { message?: string } } }
         toast.error(error?.response?.data?.message || 'Sign up failed. Please try again.')
@@ -57,13 +83,21 @@ export default function SignUp() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Create Account</h2>
 
           <form onSubmit={formik.handleSubmit} className="space-y-4">
-            <Input
-              label="Full Name"
-              placeholder="Jane Doe"
-              leftIcon={<User size={18} />}
-              {...formik.getFieldProps('name')}
-              error={formik.touched.name ? formik.errors.name : undefined}
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="First Name"
+                placeholder="Jane"
+                leftIcon={<User size={18} />}
+                {...formik.getFieldProps('firstName')}
+                error={formik.touched.firstName ? formik.errors.firstName : undefined}
+              />
+              <Input
+                label="Last Name"
+                placeholder="Doe"
+                {...formik.getFieldProps('lastName')}
+                error={formik.touched.lastName ? formik.errors.lastName : undefined}
+              />
+            </div>
 
             <Input
               label="Email"
@@ -79,8 +113,16 @@ export default function SignUp() {
               type="tel"
               placeholder="1234567890"
               leftIcon={<Phone size={18} />}
-              {...formik.getFieldProps('phone')}
-              error={formik.touched.phone ? formik.errors.phone : undefined}
+              {...formik.getFieldProps('phoneNumber')}
+              error={formik.touched.phoneNumber ? formik.errors.phoneNumber : undefined}
+            />
+
+            <Input
+              label="Zip Code"
+              placeholder="07041"
+              leftIcon={<MapPin size={18} />}
+              {...formik.getFieldProps('zipCode')}
+              error={formik.touched.zipCode ? formik.errors.zipCode : undefined}
             />
 
             <Input

@@ -1,151 +1,104 @@
-import { useState, useEffect } from 'react'
-import { Bell, Moon, Globe, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
+import { Bell, HelpCircle, Phone, FileText, Shield, Info, Trash2, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { getNotificationSettings, updateNotificationSettings } from '../../helper/api'
+import { logout } from '../../redux/slices/authSlice'
+import { deleteAccount } from '../../helper/api'
 import PageHeader from '../../components/common/PageHeader'
-import Spinner from '../../components/common/Spinner'
 import Modal from '../../components/common/Modal'
 import Button from '../../components/common/Button'
 
-interface NotifSettings {
-  orderUpdates: boolean
-  promotions: boolean
-  chat: boolean
-  reminders: boolean
-}
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        checked ? 'bg-primary' : 'bg-gray-300'
-      }`}
-    >
-      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-        checked ? 'translate-x-6' : 'translate-x-1'
-      }`} />
-    </button>
-  )
-}
+const MENU_ITEMS = [
+  { icon: Bell, label: 'Notifications', to: '/notifications', color: 'text-orange-500' },
+  { icon: HelpCircle, label: 'FAQ', to: '/settings/faq', color: 'text-blue-500' },
+  { icon: Phone, label: 'Contact Us', to: '/settings/contact', color: 'text-green-500' },
+  { icon: FileText, label: 'Terms Of Services', to: '/settings/terms', color: 'text-indigo-500' },
+  { icon: Shield, label: 'Privacy Policy', to: '/settings/privacy', color: 'text-purple-500' },
+  { icon: Info, label: 'About Us', to: '/settings/about', color: 'text-teal-500' },
+]
 
 export default function Settings() {
-  const [notifSettings, setNotifSettings] = useState<NotifSettings>({
-    orderUpdates: true, promotions: true, chat: true, reminders: true,
-  })
-  const [loading, setLoading] = useState(true)
-  const [deleteModal, setDeleteModal] = useState(false)
+  const navigate = useNavigate()
+  const dispatch = useDispatch()
+  const [deleteStep, setDeleteStep] = useState(0) // 0 = closed, 1 = first confirm, 2 = final confirm
+  const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => {
-    getNotificationSettings()
-      .then(res => {
-        if (res.data?.data) setNotifSettings(res.data.data)
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
-
-  const handleToggle = async (key: keyof NotifSettings, value: boolean) => {
-    const updated = { ...notifSettings, [key]: value }
-    setNotifSettings(updated)
+  const handleDeleteAccount = async () => {
+    setDeleting(true)
     try {
-      await updateNotificationSettings(updated)
+      await deleteAccount()
+      dispatch(logout())
+      toast.success('Account deleted successfully')
+      navigate('/login')
     } catch {
-      toast.error('Failed to save settings')
-      setNotifSettings(prev => ({ ...prev, [key]: !value }))
+      toast.error('Failed to delete account. Please try again.')
+    } finally {
+      setDeleting(false)
+      setDeleteStep(0)
     }
   }
 
-  if (loading) return (
-    <div>
-      <PageHeader title="Settings" />
-      <div className="flex justify-center py-12"><Spinner size="lg" /></div>
-    </div>
-  )
-
   return (
     <div>
       <PageHeader title="Settings" />
 
-      <div className="space-y-4">
-        {/* Notifications */}
-        <div className="card">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-            <Bell size={18} className="text-primary" />
-            <p className="font-semibold text-gray-900">Notifications</p>
-          </div>
-          {([
-            { key: 'orderUpdates', label: 'Order Updates', desc: 'Status changes and delivery alerts' },
-            { key: 'promotions', label: 'Promotions', desc: 'Deals and special offers' },
-            { key: 'chat', label: 'Chat Messages', desc: 'Messages from chefs' },
-            { key: 'reminders', label: 'Reminders', desc: 'Scheduled order reminders' },
-          ] as const).map(({ key, label, desc }) => (
-            <div key={key} className="px-5 py-4 border-b border-gray-100 last:border-0 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900">{label}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
-              </div>
-              <Toggle checked={notifSettings[key]} onChange={v => handleToggle(key, v)} />
-            </div>
+      <div className="space-y-3">
+        {/* Menu items */}
+        <div className="card overflow-hidden divide-y divide-gray-100">
+          {MENU_ITEMS.map(({ icon: Icon, label, to, color }) => (
+            <button
+              key={label}
+              onClick={() => navigate(to)}
+              className="w-full flex items-center gap-3 px-4 py-4 hover:bg-gray-50 transition-colors text-left"
+            >
+              <Icon size={20} className={color} />
+              <span className="flex-1 text-sm font-medium text-gray-900">{label}</span>
+              <ChevronRight size={16} className="text-gray-400" />
+            </button>
           ))}
         </div>
 
-        {/* Appearance */}
-        <div className="card">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-            <Moon size={18} className="text-primary" />
-            <p className="font-semibold text-gray-900">Appearance</p>
-          </div>
-          <div className="px-5 py-4 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">Dark Mode</p>
-              <p className="text-xs text-gray-500 mt-0.5">Coming soon</p>
-            </div>
-            <Toggle checked={false} onChange={() => toast('Dark mode coming soon!')} />
-          </div>
+        {/* Delete Account */}
+        <div className="card overflow-hidden">
+          <button
+            onClick={() => setDeleteStep(1)}
+            className="w-full flex items-center gap-3 px-4 py-4 hover:bg-red-50 transition-colors text-left"
+          >
+            <Trash2 size={20} className="text-red-500" />
+            <span className="flex-1 text-sm font-medium text-red-500">Delete Account</span>
+            <ChevronRight size={16} className="text-gray-400" />
+          </button>
         </div>
 
-        {/* Language */}
-        <div className="card">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-            <Globe size={18} className="text-primary" />
-            <p className="font-semibold text-gray-900">Language</p>
-          </div>
-          <div className="px-5 py-4 flex items-center justify-between">
-            <p className="text-sm text-gray-700">English</p>
-            <span className="text-xs text-gray-400">More languages coming soon</span>
-          </div>
-        </div>
-
-        {/* Danger zone */}
-        <div className="card border-red-100">
-          <div className="px-5 py-4 border-b border-red-50 flex items-center gap-2">
-            <Trash2 size={18} className="text-red-500" />
-            <p className="font-semibold text-red-600">Danger Zone</p>
-          </div>
-          <div className="px-5 py-4">
-            <p className="text-sm text-gray-600 mb-3">
-              Deleting your account is permanent and cannot be undone.
-            </p>
-            <button
-              onClick={() => setDeleteModal(true)}
-              className="text-sm text-red-500 font-medium hover:underline"
-            >
-              Delete Account
-            </button>
-          </div>
-        </div>
+        {/* App version */}
+        <p className="text-center text-xs text-gray-400 pt-4 pb-8">
+          App version - V1.0.0
+        </p>
       </div>
 
-      <Modal isOpen={deleteModal} onClose={() => setDeleteModal(false)} title="Delete Account?">
+      {/* Step 1: First confirmation */}
+      <Modal isOpen={deleteStep === 1} onClose={() => setDeleteStep(0)} title="Delete Account">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
+            <Trash2 size={28} className="text-red-500" />
+          </div>
+          <p className="text-gray-600">Are you sure you want to delete account?</p>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline" fullWidth onClick={() => setDeleteStep(0)}>No</Button>
+          <Button variant="danger" fullWidth onClick={() => setDeleteStep(2)}>Yes</Button>
+        </div>
+      </Modal>
+
+      {/* Step 2: Final confirmation */}
+      <Modal isOpen={deleteStep === 2} onClose={() => setDeleteStep(0)} title="Final Confirmation">
         <p className="text-gray-600 mb-6">
-          This will permanently delete your account and all associated data. This action cannot be undone.
+          The account will be permanently deleted and all the data will be lost, are you sure? Press 'Ok' or 'Cancel'
         </p>
         <div className="flex gap-3">
-          <Button variant="outline" fullWidth onClick={() => setDeleteModal(false)}>Cancel</Button>
-          <Button variant="danger" fullWidth onClick={() => toast.error('Please contact support to delete your account')}>
-            Delete Account
-          </Button>
+          <Button variant="outline" fullWidth onClick={() => setDeleteStep(0)}>Cancel</Button>
+          <Button variant="danger" fullWidth loading={deleting} onClick={handleDeleteAccount}>Ok</Button>
         </div>
       </Modal>
     </div>

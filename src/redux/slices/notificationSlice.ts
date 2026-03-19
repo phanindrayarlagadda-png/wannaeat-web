@@ -34,8 +34,17 @@ const notificationSlice = createSlice({
         state.unreadCount = Math.max(0, state.unreadCount - 1)
       }
     },
+    removeNotification(state, action: PayloadAction<string>) {
+      const notif = state.notifications.find(n => n.id === action.payload)
+      if (notif && !notif.isRead) state.unreadCount = Math.max(0, state.unreadCount - 1)
+      state.notifications = state.notifications.filter(n => n.id !== action.payload)
+    },
+    clearAll(state) {
+      state.notifications = []
+      state.unreadCount = 0
+    },
   },
 })
 
-export const { setNotifications, addNotification, markAllRead, markRead } = notificationSlice.actions
+export const { setNotifications, addNotification, markAllRead, markRead, removeNotification, clearAll } = notificationSlice.actions
 export default notificationSlice.reducer

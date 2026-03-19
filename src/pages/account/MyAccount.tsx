@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
-  User, MapPin, CreditCard, Settings, Star, MessageCircle,
-  Bell, LogOut, ChevronRight, Shield
+  User, MapPin, CreditCard, Settings, MessageCircle,
+  Bell, LogOut, ChevronRight, ClipboardList, Heart, Utensils
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { RootState } from '../../redux/store'
@@ -10,13 +10,11 @@ import { logout } from '../../redux/slices/authSlice'
 import { buildImageUrl } from '../../utils/imageUrl'
 
 const MENU_ITEMS = [
-  { icon: User, label: 'Edit Profile', to: '/account/profile', color: 'text-blue-500' },
+  { icon: User, label: 'Profile', to: '/account/profile', color: 'text-blue-500' },
+  { icon: Utensils, label: 'Services', to: '/account/services', color: 'text-indigo-500' },
   { icon: MapPin, label: 'Address Book', to: '/account/addresses', color: 'text-green-500' },
-  { icon: CreditCard, label: 'Payment Methods', to: '/account/payment-methods', color: 'text-purple-500' },
-  { icon: Star, label: 'Premium Membership', to: '/account/premium', color: 'text-yellow-500' },
-  { icon: MessageCircle, label: 'Chat', to: '/chat', color: 'text-primary' },
+  { icon: CreditCard, label: 'Payment', to: '/account/payment-methods', color: 'text-purple-500' },
   { icon: Bell, label: 'Notifications', to: '/notifications', color: 'text-orange-500' },
-  { icon: Shield, label: 'Privacy Policy', to: '/privacy', color: 'text-gray-500' },
   { icon: Settings, label: 'Settings', to: '/account/settings', color: 'text-gray-500' },
 ]
 
@@ -69,11 +67,42 @@ export default function MyAccount() {
         </div>
       </div>
 
+      {/* Quick Action Cards - matching mobile's Orders, Favorites, Messages */}
+      <div className="grid grid-cols-3 gap-3">
+        <button
+          onClick={() => navigate('/orders')}
+          className="card p-4 flex flex-col items-center gap-2 hover:shadow-md transition-shadow"
+        >
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+            <ClipboardList size={20} />
+          </div>
+          <span className="text-xs font-semibold text-gray-700">Orders</span>
+        </button>
+        <button
+          onClick={() => navigate('/favorites')}
+          className="card p-4 flex flex-col items-center gap-2 hover:shadow-md transition-shadow"
+        >
+          <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-500">
+            <Heart size={20} />
+          </div>
+          <span className="text-xs font-semibold text-gray-700">Favorites</span>
+        </button>
+        <button
+          onClick={() => navigate('/chat')}
+          className="card p-4 flex flex-col items-center gap-2 hover:shadow-md transition-shadow relative"
+        >
+          <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
+            <MessageCircle size={20} />
+          </div>
+          <span className="text-xs font-semibold text-gray-700">Messages</span>
+        </button>
+      </div>
+
       {/* Menu items */}
       <div className="card divide-y divide-gray-100">
         {MENU_ITEMS.map(({ icon: Icon, label, to, color }) => (
           <button
-            key={to}
+            key={label}
             onClick={() => navigate(to)}
             className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors text-left"
           >
